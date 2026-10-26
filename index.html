@@ -2882,7 +2882,7 @@ function frame(now){
       cam.z=cam.z?lerp(cam.z,zt,Math.min(1,dt*2.5)):zt;
       cam.lx=lerp(cam.lx??tx,tx,Math.min(1,dt*2.4));cam.ly=lerp(cam.ly??ty,ty,Math.min(1,dt*2.4));cam.x=cam.lx;cam.y=cam.ly;
     }else if(leo&&(S.phase==='leo'||S.phase==='coast')&&body){
-      const zt=Math.min(sScale()*.72*4.5*userZoom,leoZoomNeed());cam.z=cam.z?lerp(cam.z,zt,Math.min(1,dt*(zt<cam.z?3:1.2))):zt;cam.x=body.x;cam.y=body.y;cam.lx=cam.ly=undefined;
+      const zt=Math.min(sScale()*.72*1.6*userZoom,leoZoomNeed());cam.z=cam.z?lerp(cam.z,zt,Math.min(1,dt*(zt<cam.z?3:1.2))):zt;cam.x=body.x;cam.y=body.y;cam.lx=cam.ly=undefined;
     }else if(body){
       cam.lx=cam.ly=undefined;
       const g=planet.ground(body.x);const alt=Math.max(0,body.y-g);
