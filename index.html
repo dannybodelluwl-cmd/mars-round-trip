@@ -180,6 +180,8 @@ body.surface #capcom{bottom:calc(178px + env(safe-area-inset-bottom,0px))}
 .btn:focus-visible,.tg:focus-visible,.mini:focus-visible{outline:2px solid rgba(240,240,250,.55);outline-offset:2px}
 .lab{font-family:var(--din);font-weight:600;color:rgba(240,240,250,.55);letter-spacing:.22em;font-size:11px;border-top:1px solid rgba(240,240,250,.14);padding-top:14px}
 .rk,.rkinfo,.slot,.cg,.base,.stat{background:rgba(240,240,250,.03);border:1px solid rgba(240,240,250,.14);border-radius:0}
+canvas.cgart{display:block;width:calc(100% + 12px);margin:-8px -6px 6px;aspect-ratio:9/5;height:auto;border-bottom:1px solid rgba(240,240,250,.12)}
+.cg:disabled canvas.cgart{filter:grayscale(.8)}
 .rk.on,.cg.on{border-color:var(--sw);box-shadow:none;background:rgba(240,240,250,.09)}
 .rk b,.cg b,.rkinfo h3,.base h3{font-family:var(--din);font-weight:700;letter-spacing:.1em;color:var(--sw)}
 .rk small,.cg small{color:rgba(240,240,250,.5)}
@@ -330,7 +332,8 @@ try{const c=JSON.parse(localStorage.getItem('mrt.colony')||'null');if(c&&Array.i
 for(const k of['landings','builds','bprog'])colony[k]=colony[k]||0;
 function colSave(){try{localStorage.setItem('mrt.colony',JSON.stringify(colony))}catch(e){}cloudWrite('colony',{json:JSON.stringify(colony)})}
 const modMax=t=>MODS[t].max||3;
-const colN=t=>MODS[t]?Math.min(modMax(t),colony.mods.filter(m=>m.t===t).length):0;   // building level, 0 = not built
+let PV=null; // preview override: {type:level} while painting cargo art
+const colN=t=>PV&&t in PV?PV[t]:MODS[t]?Math.min(modMax(t),colony.mods.filter(m=>m.t===t).length):0;   // building level, 0 = not built
 const colBuilt=()=>Object.keys(MODS).filter(k=>colN(k));
 const colCrew=()=>colBuilt().reduce((a,k)=>a+(MODS[k].crew?MODS[k].crew[colN(k)-1]:0),0)+(colBuilt().length?2:0);
 const modW=t=>MODS[t].w[Math.max(0,colN(t)-1)];
@@ -1132,6 +1135,34 @@ function drawPreview(c,r){
   g.save();g.translate(0,-25);drawBooster(false,false,1);g.restore();
   ctx=oc;setRocket(oR);ship=oS;Object.assign(LIGHT,oL);
 }
+// Cargo card art: the real module, painted at the level you'd deliver, in a Martian dusk scene (blue sunset and all)
+function makeCargoArt(k,lv){
+  const CW=360,CH=200,[c,g]=mkCanvas(CW,CH),gy=CH*.8;
+  const sk=g.createLinearGradient(0,0,0,gy);sk.addColorStop(0,'#120d16');sk.addColorStop(.4,'#4a2c2c');sk.addColorStop(.8,'#b5735a');sk.addColorStop(1,'#d9a07c');g.fillStyle=sk;g.fillRect(0,0,CW,CH);
+  const R=seeded(k.length*97+lv*13);g.fillStyle='#fff';for(let i=0;i<40;i++){g.globalAlpha=R()*.7*(1-i/40);g.fillRect(R()*CW,R()*gy*.45,1,1)}g.globalAlpha=1;
+  const sx=CW*(.18+R()*.64),sy=gy-14,bl=g.createRadialGradient(sx,sy,1,sx,sy,90);bl.addColorStop(0,'rgba(220,240,255,.95)');bl.addColorStop(.08,'rgba(150,200,255,.6)');bl.addColorStop(.35,'rgba(90,140,220,.18)');bl.addColorStop(1,'rgba(90,140,220,0)');
+  g.fillStyle=bl;g.fillRect(0,0,CW,CH);g.fillStyle='#f4fbff';g.beginPath();g.arc(sx,sy,3.2,0,6.283);g.fill();
+  for(const [col,base,amp,f] of[['#7c4a3a',gy-26,10,.021],['#94563c',gy-12,7,.037]]){g.fillStyle=col;g.beginPath();g.moveTo(0,CH);for(let x=0;x<=CW;x+=6)g.lineTo(x,base-amp*(Math.sin(x*f+lv+k.length)*.6+Math.sin(x*f*2.7)*.4));g.lineTo(CW,CH);g.fill()}
+  const gr=g.createLinearGradient(0,gy,0,CH);gr.addColorStop(0,'#a2583a');gr.addColorStop(1,'#4a2416');g.fillStyle=gr;g.fillRect(0,gy,CW,CH-gy);
+  g.fillStyle='rgba(255,210,170,.18)';g.fillRect(0,gy,CW,1.5);
+  const view={hab:lv>=2?20+lv*3:11,depot:9,green:10,garage:8+1.6*lv,solar:6.5,comms:13+3.7*lv,rig:16+4*lv,pad:58}[k]||20;
+  const oc=ctx,op=particles,oPV=PV,oL={...LIGHT},oSun={...SUN},oD=DPR;
+  PV={[k]:lv};const w=modW(k),x=modX(k),lvl=marsAt(x),sc=Math.min((CW-30)/(w+16),(gy-18)/view);
+  ctx=g;particles=[];DPR=1;LIGHT.lx=.55;LIGHT.shade=.3;SUN.x=sx;SUN.y=sy;
+  try{
+    g.save();g.setTransform(sc,0,0,-sc,CW/2-x*sc,gy+lvl*sc);
+    const ao=g.createRadialGradient(x,lvl,1,x,lvl,w*.75);ao.addColorStop(0,'rgba(30,12,6,.45)');ao.addColorStop(1,'rgba(30,12,6,0)');g.fillStyle=ao;g.beginPath();g.ellipse(x,lvl,w*.75,2,0,0,6.283);g.fill();
+    if(k==='pad')propVehicle('ship',BASE_X,lvl+1.6);
+    drawModule(k,7.3+lv);
+    g.restore();
+  }catch(e){}
+  ctx=oc;particles=op;PV=oPV;Object.assign(LIGHT,oL);Object.assign(SUN,oSun);DPR=oD;
+  // dust haze near the ground, then a soft vignette
+  const hz=g.createLinearGradient(0,gy-30,0,gy+8);hz.addColorStop(0,'rgba(220,150,110,0)');hz.addColorStop(1,'rgba(220,150,110,.22)');g.fillStyle=hz;g.fillRect(0,gy-30,CW,38);
+  const vg=g.createRadialGradient(CW/2,CH/2,CH*.35,CW/2,CH/2,CW*.65);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.45)');g.fillStyle=vg;g.fillRect(0,0,CW,CH);
+  return c;
+}
+function paintCargoArt(cv,k,lv){const art=getTex(`cg_${k}_${lv}`,()=>makeCargoArt(k,lv)),d=Math.min(2,devicePixelRatio||1),w=cv.clientWidth||160,h=cv.clientHeight||90;cv.width=Math.round(w*d);cv.height=Math.round(h*d);cv.getContext('2d').drawImage(art,0,0,cv.width,cv.height)}
 function menu(){
   S.phase='menu';S.paused=true;S.catching=false;S.catchAnim=null;$('zoom').hidden=true;document.body.classList.remove('surface');
   $('hud').hidden=true;$('ctl').hidden=true;$('mine').hidden=true;
@@ -1162,14 +1193,14 @@ function menu(){
     ${!hangar.includes('VAC')?'<div class="warnline">No VAC engines: interplanetary burns will cost almost double.</div>':''}
     ${hangar.filter(t=>t==='SL').length<2?'<div class="warnline">Fewer than 2 SL engines: you cannot land on Earth.</div>':''}
     <div class="lab"><span>3 · CARGO FOR JEZERO BASE</span><span>${colBuilt().length} BUILT</span></div>
-    <div class="cargo">${Object.entries(MODS).map(([k,m])=>{const c=colN(k),dis=c>=modMax(k);return `<button class="cg${k===cargoSel?' on':''}" data-c="${k}" ${dis?'disabled':''} aria-pressed="${k===cargoSel}"><b>${m.short}</b><small>${m.desc}</small>${c?`<span class="n">${dis?'Complete':'Level '+c+' → '+(c+1)}</span>`:'<span class="n">New</span>'}</button>`}).join('')}</div>
+    <div class="cargo">${Object.entries(MODS).map(([k,m])=>{const c=colN(k),dis=c>=modMax(k);return `<button class="cg${k===cargoSel?' on':''}" data-c="${k}" data-lv="${Math.min(modMax(k),c+1)}" ${dis?'disabled':''} aria-pressed="${k===cargoSel}"><canvas class="cgart" aria-hidden="true"></canvas><b>${m.short}</b><small>${m.desc}</small>${c?`<span class="n">${dis?'Complete':'Level '+c+' → '+(c+1)}</span>`:'<span class="n">New</span>'}</button>`}).join('')}</div>
     <div class="base"><div class="row2"><h3>Jezero Base</h3>${colony.mods.length?'<button class="mini" id="rsb">Reset base</button>':''}</div>
       <div>${colBuilt().length?`${colBuilt().length} building${colBuilt().length===1?'':'s'} · crew of ${colCrew()} · ${colBuilt().map(k=>MODS[k].short+(modMax(k)>1?' L'+colN(k):'')).join(', ')}${colPop()?` · ${colPop()} colonists`:''}${colony.builds?` · ${colony.builds} crew projects`:''}${colony.samples?` · ${colony.samples} sample tube${colony.samples>1?'s':''} returned`:''}`:'Every rocket that lands on Mars delivers its cargo here. Sending the same module again upgrades it, up to level 3.'}</div></div>
     <div class="keys">${SAVE.cloud?'Progress saves to your Claude account at every phase, so you can pick up on another device.':'Progress saves in this browser at every phase.'}</div>
     <div class="toggles"><button class="tg" id="tgS" aria-pressed="${AU.on}">Sound: ${AU.on?'on':'off'}</button><button class="tg" id="tgV" aria-pressed="${AU.voice}">Voice callouts: ${AU.voice?'on':'off'}</button></div>
     <div class="btns"><button class="btn" id="start">Light the candle</button><button class="btn ghost" id="fs2">Flight school</button></div>
     <div class="keys">Flight: ← → rotate · ↑ or Space thrust · E engine mode · S stage · P chute · M mine (in orbit) · +/− zoom<br>Rover: ← → drive · Space for the action button · L launch</div>`);
-    document.querySelectorAll('.cg').forEach(b=>b.onclick=()=>{cargoSel=b.dataset.c;sfx('ui');draw()});
+    document.querySelectorAll('.cg').forEach(b=>{b.onclick=()=>{cargoSel=b.dataset.c;sfx('ui');draw()};requestAnimationFrame(()=>paintCargoArt(b.querySelector('canvas'),b.dataset.c,+b.dataset.lv))});
     if($('rsb'))$('rsb').onclick=e=>{const b=e.currentTarget;if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='Tap again to reset';return}colony={mods:[],samples:0,landings:0,builds:0,bprog:0};colSave();cargoSel='hab';draw()};
     if($('cont'))$('cont').onclick=()=>{hide();continueGame()};
     if($('dsv'))$('dsv').onclick=e=>{const b=e.currentTarget;if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='Tap again to discard';return}clearGame();draw()};
