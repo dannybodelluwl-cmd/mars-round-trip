@@ -1683,12 +1683,13 @@ const BG={L:1.9,rest:1.15,minLen:.35,maxLen:1.3,k:3.6,c:1.5,kl:260,cl:14,mw:.2,m
 // cargo-bay ramp on the ship's right side: hinged at the bay floor, 10 m long, ~30° when open
 const RAMP={floor:5,len:10};
 function rampGeo(){const sx=body.x,g=marsAt(sx),hx=sx+4.5,hy=g+RAMP.floor,o=mining?mining.ramp:0,th=o*2.094;return{sx,g,hx,hy,ex:hx+Math.sin(th)*RAMP.len,ey:hy+Math.cos(th)*RAMP.len,o}}
-function surfH(x){
+let rampLane=false; // true while the rover is still in the bay or on its way down the ramp
+function surfH(x,y){ // y given: the bay floor and ramp only count if you're on them, not passing underneath
   let h=marsAt(x);const m=mining,ps=m&&m.near;
   if(ps)for(const p of ps){const d=Math.abs(x-p.x);if(d<p.r)h=Math.max(h,marsAt(p.x)+p.h*(.5+.5*Math.cos(Math.PI*d/p.r)))}
   if(m&&m.ramp>.98&&body){const r=rampGeo();
-    if(x>=r.sx-1.5&&x<=r.hx)h=Math.max(h,r.hy);                                    // bay floor
-    else if(x>r.hx&&x<=r.ex)h=Math.max(h,r.hy+(x-r.hx)/(r.ex-r.hx)*(r.ey-r.hy));    // ramp
+    if(x>=r.sx-1.5&&x<=r.hx){if(y===undefined||rampLane&&y>r.hy-1.2)h=Math.max(h,r.hy)}      // bay floor
+    else if(x>r.hx&&x<=r.ex){const rh=r.hy+(x-r.hx)/(r.ex-r.hx)*(r.ey-r.hy);if(y===undefined||rampLane&&y>rh-1.2)h=Math.max(h,rh)} // ramp
   }
   return h;
 }
@@ -1760,7 +1761,7 @@ function roverDo(a){
   else if(a.k==='collect'){a.dep.left=0;m.bg.cargo.sample=(m.bg.cargo.sample||0)+1;toast('Sample tube recovered','var(--ok)');sfx('chime');
     if(!m.f1){m.f1=1;callout('Nice work. That is one of Perseverance\'s sample tubes. Bring it home.')}}
   else if(a.k==='shelter'){m.rover='shelter';m.shelter=a.to;m.shX=m.bg.x;m.bg.vx=m.bg.vy=0;sfx('clunk');toast(`Rover inside the ${MODS[a.to].short.toLowerCase()}`,'var(--ok)')}
-  else if(a.k==='exit'){const x=modX(m.shelter)+(modW(m.shelter)/2+4)*(m.shX>modX(m.shelter)?1:-1);const c=m.bg?m.bg.cargo:{ice:0,iron:0};m.bg=mkRover(x);m.bg.cargo=c;m.rover='out';m.shelter=null;sfx('servo')}
+  else if(a.k==='exit'){const x=modX(m.shelter)+(modW(m.shelter)/2+4)*(m.shX>modX(m.shelter)?1:-1);const c=m.bg?m.bg.cargo:{ice:0,iron:0};rampLane=false;m.bg=mkRover(x);m.bg.cargo=c;m.rover='out';m.shelter=null;sfx('servo')}
 }
 function unload(){
   const m=mining,c=m.bg.cargo;if(c.ice+c.iron<=0)return;
@@ -1769,7 +1770,7 @@ function unload(){
   c.ice=c.iron=0;sfx('clunk');
 }
 function mkRover(x){
-  const y1=surfH(x-BG.L)+BG.wr,y2=surfH(x+BG.L)+BG.wr,ang=Math.atan2(y2-y1,2*BG.L),ca=Math.cos(ang),sa=Math.sin(ang),l=BG.rest*.8;
+  const yq=rampLane?undefined:-1e9,y1=surfH(x-BG.L,yq)+BG.wr,y2=surfH(x+BG.L,yq)+BG.wr,ang=Math.atan2(y2-y1,2*BG.L),ca=Math.cos(ang),sa=Math.sin(ang),l=BG.rest*.8;
   const b={x:x-(l+.25)*sa,y:(y1+y2)/2+(l+.25)*ca,vx:0,vy:0,ang,av:0,flip:0,w:[],cargo:{ice:0,iron:0}};
   for(const off of[-BG.L,BG.L]){const ax=b.x+ca*off+sa*.25,ay=b.y+sa*off-ca*.25;b.w.push({x:ax+sa*l,y:ay-ca*l,vx:0,vy:0,spin:0,contact:false,len:l})}
   return b;
@@ -1777,6 +1778,7 @@ function mkRover(x){
 // Chassis plus two sprung wheel masses: each wheel rides a spring-damper strut, a stiff lateral link carries traction
 function stepRover(dt){
   const m=mining,b=m.bg,g=MARS.g;
+  {const r=rampGeo();if(b.lane&&(b.x>r.ex+3||m.ramp<.98))b.lane=false;rampLane=!!b.lane} // off the ramp foot: free to drive past the ship
   const ca=Math.cos(b.ang),sa=Math.sin(b.ang),rx=ca,ry=sa,ux=-sa,uy=ca;
   const thr=((keys.right?1:0)-(keys.left?1:0))*(m.slow>0?.35:1)*(m.stormOn?.55:1)*(m.bat<=0?.3:1)*(1+.15*colN('garage'));
   let fx=0,fy=-g*BG.mc,tq=0,any=false;
@@ -1792,9 +1794,9 @@ function stepRover(dt){
     const Fl=BG.kl*lat+BG.cl*latV,wfx=ux*Fs-rx*Fl,wfy=uy*Fs-ry*Fl;
     fx-=wfx;fy-=wfy;tq+=(ax-b.x)*(-wfy)-(ay-b.y)*(-wfx);
     w.vx+=wfx/BG.mw*dt;w.vy+=(wfy/BG.mw-g)*dt;w.x+=w.vx*dt;w.y+=w.vy*dt;w.len=along;
-    const h=surfH(w.x),pen=h+BG.wr-w.y,was=w.contact;w.contact=pen>-.03;
+    const h=surfH(w.x,w.y),pen=h+BG.wr-w.y,was=w.contact;w.contact=pen>-.03;
     if(pen>0){
-      const sl=(surfH(w.x+.25)-surfH(w.x-.25))/.5,nn=Math.hypot(1,sl),tx=1/nn,ty=sl/nn,nx=-sl/nn,ny=1/nn;
+      const sl=(surfH(w.x+.25,w.y)-surfH(w.x-.25,w.y))/.5,nn=Math.hypot(1,sl),tx=1/nn,ty=sl/nn,nx=-sl/nn,ny=1/nn;
       w.y+=pen;
       let vn=w.vx*nx+w.vy*ny,vt=w.vx*tx+w.vy*ty;
       if(!was&&vn<-2.5)sfx('bump');
@@ -1808,10 +1810,12 @@ function stepRover(dt){
   b.vx+=fx/BG.mc*dt;b.vy+=fy/BG.mc*dt;b.av+=tq/BG.I*dt;b.av*=Math.pow(.6,dt);b.av=clamp(b.av,-4,4);
   b.x+=b.vx*dt;b.y+=b.vy*dt;b.ang+=b.av*dt;
   for(const [px,py] of[[-2.6,-.2],[2.6,-.2],[-2.4,2.2],[2.4,2.2],[0,2.6]]){
-    const wx=b.x+ca*px-sa*py,wy=b.y+sa*px+ca*py,h=surfH(wx);
+    const wx=b.x+ca*px-sa*py,wy=b.y+sa*px+ca*py,h=surfH(wx,wy);
     if(wy<h){b.y+=h-wy;const vy=b.vy+b.av*(wx-b.x);if(vy<0)b.vy-=vy*.9;b.vx*=.97;b.av*=.9}
   }
-  const gc=surfH(b.x),ua=Math.atan2(Math.sin(b.ang),Math.cos(b.ang));
+  // back wall of the cargo bay
+  if(m.ramp>.98&&b.lane){const r=rampGeo(),lim=r.sx+1.2;if(b.y>r.hy-.6&&b.x<lim&&b.x>r.sx-8){const d=lim-b.x;b.x+=d;b.vx=Math.max(0,b.vx);for(const w of b.w){w.x+=d;w.vx=Math.max(0,w.vx)}}}
+  const gc=surfH(b.x,b.y),ua=Math.atan2(Math.sin(b.ang),Math.cos(b.ang));
   if(Math.abs(ua)>1.7&&b.y<gc+3.2){b.flip+=dt;if(b.flip>1.4){Object.assign(b,mkRover(b.x),{cargo:b.cargo});m.storm-=6;toast('Rover rolled — crew righted it (−6 s)','var(--warn)');sfx('clunk')}}else b.flip=0;
 }
 function stepSurface(dt){
@@ -1819,7 +1823,7 @@ function stepSurface(dt){
   if(m.slow>0)m.slow-=dt;
   // ramp animation; the rover rolls out onto the bay floor once it's down
   if(m.rampDir){m.ramp=clamp(m.ramp+m.rampDir*dt/2.2,0,1);
-    if(m.rampDir>0&&m.ramp>=1){m.rampDir=0;const r=rampGeo();m.bg=mkRover(r.hx-.4);m.rover='out';Object.assign(m.bg.cargo,{ice:0,iron:0,sample:0});}
+    if(m.rampDir>0&&m.ramp>=1){m.rampDir=0;const r=rampGeo();rampLane=true;m.bg=mkRover(r.hx-.4);m.bg.lane=true;m.rover='out';Object.assign(m.bg.cargo,{ice:0,iron:0,sample:0});}
     if(m.rampDir<0&&m.ramp<=0){m.rampDir=0}}
   if(m.rover==='out'&&m.bg){
     const b=m.bg;
