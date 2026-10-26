@@ -129,7 +129,7 @@ button:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 #capcom.alert b{color:var(--bad)}
 body.surface #capcom{bottom:calc(178px + env(safe-area-inset-bottom,0px))}
 .tr{display:flex;gap:8px;align-items:flex-start}
-#snd,#tac{pointer-events:auto;white-space:nowrap;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,18,.6);border-radius:6px;font-size:9.5px;letter-spacing:.1em;padding:4px 6px;color:#dfe6ec}
+#snd,#tac,#rst{pointer-events:auto;white-space:nowrap;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,18,.6);border-radius:6px;font-size:9.5px;letter-spacing:.1em;padding:4px 6px;color:#dfe6ec}
 #snd.off,#tac.off{color:var(--dim)}
 #toast.big{font-size:clamp(48px,16vw,96px);top:26%}
 .cargo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -164,7 +164,7 @@ body.surface #capcom{bottom:calc(178px + env(safe-area-inset-bottom,0px))}
   <div id="hud" hidden>
     <div class="top">
       <div id="ph">Earth Ascent<small id="obj"></small></div>
-      <div class="tr"><div id="clock">T+00:00</div><button id="tac" aria-label="Toggle tactical HUD">HUD</button><button id="snd" aria-label="Toggle sound">SOUND</button></div>
+      <div class="tr"><div id="clock">T+00:00</div><button id="rst" aria-label="Restart or pause">↻ RESTART</button><button id="tac" aria-label="Toggle tactical HUD">HUD</button><button id="snd" aria-label="Toggle sound">SOUND</button></div>
     </div>
     <div class="side left" id="sideL">
       <div class="cell" id="rA"><span class="k" id="kA">ALT</span><b id="vA">0</b><small id="tA"></small></div>
@@ -1121,14 +1121,26 @@ function updSnd(){const b=$('snd');b.textContent=AU.on?'SOUND ON':'SOUND OFF';b.
 $('snd').addEventListener('click',()=>{AU.on=!AU.on;auSave();updSnd();auInit()});
 updSnd();
 $('tac').addEventListener('click',()=>setTac(!TAC));
+function pauseMenu(){
+  if(S.phase==='menu'||!S.cpPhase||!$('ov').hidden)return;
+  const wasPaused=S.paused;for(const k in keys)keys[k]=false;
+  show(`<div class="eyebrow">Paused · ${PHASES[S.cpPhase].title}</div><h2>Restart?</h2><p>Restarting the stage puts you back where ${PHASES[S.cpPhase].title.toLowerCase()} began, with the ship as it was then. A new mission goes back to rocket selection. Jezero Base keeps everything you've built.</p>
+    <div class="btns"><button class="btn" id="pzS">Restart stage</button><button class="btn ghost" id="pzN">New mission</button><button class="btn ghost" id="pzR">Resume</button></div>`);
+  $('pzS').onclick=()=>{hide();S.failing=false;retry()};
+  $('pzN').onclick=()=>{hide();S.failing=false;menu()};
+  $('pzR').onclick=()=>{hide();S.paused=wasPaused};
+}
+$('rst').addEventListener('click',pauseMenu);
 const KMAP={KeyM:'mine',Equal:'zin',NumpadAdd:'zin',Minus:'zout',NumpadSubtract:'zout',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'thrust',KeyW:'thrust',Space:'thrust'};
 addEventListener('keydown',e=>{
+  if(!$('ov').hidden&&$('pzR')){if(e.code==='Escape'){e.preventDefault();$('pzR').click()}return}
   if(!$('ov').hidden){if(e.code==='Enter'||e.code==='Space'){const b=$('card').querySelector('.btn');if(b){e.preventDefault();b.click()}}return}
   if(KMAP[e.code]){e.preventDefault();if(mining&&S.phase==='mining'&&KMAP[e.code]==='thrust'){if(mining.act.k==='dig')mining.digging=true;else if(!e.repeat)roverDo(mining.act);return}keys[KMAP[e.code]]=true}
   if(e.code==='KeyE'&&!e.repeat)cycleMode();
   if(e.code==='KeyS'&&!e.repeat)stage();
   if(e.code==='KeyP'&&!e.repeat)deployChute();
   if(e.code==='KeyH'&&!e.repeat)setTac(!TAC);
+  if((e.code==='Escape'||e.code==='KeyR')&&!e.repeat)pauseMenu();
   if(e.code==='KeyL'&&S.phase==='mining')launchFromMars();
 });
 addEventListener('keyup',e=>{if(KMAP[e.code]){keys[KMAP[e.code]]=false;if(mining)mining.digging=false}});
@@ -2305,6 +2317,17 @@ function stepLeo(dt){
     if(o.left<=0)toast('Asteroid mined out','var(--warn)');
   }
 }
+// widest zoom that still keeps nearby rocks, and anything heading our way, on screen
+function leoZoomNeed(){
+  const L=leo,b=body;if(!L||!b||S.phase!=='leo')return 1e9;
+  const ext=Math.max(80,Math.min(W/2-(W<600?24:100),H*.42-60,H*.58-120));let need=1e9;
+  const fit=(o,pad)=>{const d=Math.hypot(o.x-b.x,o.y-b.y)+(o.r||2)+pad;need=Math.min(need,ext/d)};
+  for(const o of L.ast)if(Math.hypot(o.x-b.x,o.y-b.y)-o.r<150)fit(o,20);
+  const closing=o=>{const px=o.x-b.x,py=o.y-b.y,d=Math.hypot(px,py);const cv=-((o.vx-b.vx)*px+(o.vy-b.vy)*py)/(d||1);return d<300&&cv>2&&(d/cv<7||d<90)}; // arriving within ~7 s
+  for(const o of L.deb)if(closing(o))fit(o,15);
+  for(const o of L.sats)if(closing(o))fit(o,20);
+  return Math.max(sScale()*.45,need);
+}
 function drawLeoSky(z){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle='#02030a';ctx.fillRect(0,0,W,H);
@@ -2488,8 +2511,8 @@ function drawWorld(z){
     }
   }
   if(inLeo&&body&&!body.dead){ // attitude ring: prograde marker vs where the nose points
-    const L=leo,cx=W/2+(body.x-cam.x)*z,cy=H*.42-(body.y-cam.y)*z,r=58,open=L.win.open,hx=Math.sin(body.ang),hy=-Math.cos(body.ang),good=hx>.97;
-    ctx.strokeStyle=open?(good?'rgba(98,222,136,.7)':'rgba(255,194,61,.6)'):'rgba(255,255,255,.18)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(cx,cy,r,0,6.283);ctx.stroke();
+    const L=leo,cx=W/2+(body.x-cam.x)*z,cy=H*.42-(body.y-cam.y)*z,r=Math.max(58,30*Math.max(z,.3*sScale())),open=L.win.open,hx=Math.sin(body.ang),hy=-Math.cos(body.ang),good=hx>.97;
+    // no ring: just the prograde chevron and the nose tick
     ctx.fillStyle=open?'#62de88':'rgba(98,222,136,.6)';ctx.beginPath();ctx.moveTo(cx+r+12,cy);ctx.lineTo(cx+r+2,cy-7);ctx.lineTo(cx+r+2,cy+7);ctx.closePath();ctx.fill();
     ctx.font='600 10px "IBM Plex Mono",monospace';ctx.textAlign='center';ctx.fillText('PROGRADE',cx+r+6,cy-12);
     ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx+hx*(r-8),cy+hy*(r-8));ctx.lineTo(cx+hx*(r+6),cy+hy*(r+6));ctx.stroke();
@@ -2642,9 +2665,11 @@ function drawTac(z){
   /* ----- low Earth orbit: classify every rock, flag debris and satellites ----- */
   if(leo&&S.phase==='leo'){
     const L=leo,ranked=L.ast.map(o=>({o,d:Math.hypot(o.x-b.x,o.y-b.y)-o.r})).sort((a,c)=>a.d-c.d),full=new Set(ranked.slice(0,3).map(e=>e.o));
+    const focus=ranked[0]&&ranked[0].d<70?ranked[0]:null; // parked beside a rock: get out of the way
     for(const {o,d} of ranked){const [sx,sy]=toS(o.x,o.y),r=Math.max(9,o.r*z*(.55+.45*clamp(o.left/o.max,0,1)))+4;
       if(!vis(sx,sy,r+40))continue;
       const ice=o.type==='ice',spent=o.left<=0,col=spent?'rgba(150,160,170,.7)':ice?'#8fdcff':'#ffc27a',rv=Math.hypot(b.vx-o.vx,b.vy-o.vy);
+      if(focus){if(o===focus.o){ctx.globalAlpha=.45;tacBracket(sx,sy,r,col,o,now);ctx.globalAlpha=1}continue}
       tacBracket(sx,sy,r,col,o,now);
       const lines=[`${tacId(o,ice?'C':'M')} · ${ice?'C-TYPE · WATER ICE':'M-TYPE · NICKEL-IRON'}`];
       if(full.has(o)){
@@ -2654,17 +2679,21 @@ function drawTac(z){
       }
       tacLabel(sx,sy,r,lines,col);
     }
+    if(focus){const o=focus.o,ice=o.type==='ice',rv=Math.hypot(b.vx-o.vx,b.vy-o.vy),ok=o.left>0&&focus.d<28&&rv<=2.5;
+      const yl=o.left<=0?'DEPLETED':ice?`+${Math.round(Math.min(o.left*.42,99))}% FUEL LEFT`:`≈${Math.max(1,Math.round(o.left/22))} KITS LEFT`;
+      const st=o.left<=0?'':L.mining?' · MINING':focus.d>=28?` · ${Math.round(focus.d)} m · CLOSE IN`:rv>2.5?` · REL ${rv.toFixed(1)} › 2.5`:' · IN RANGE';
+      tacChip(W/2,H-182,`${tacId(o,ice?'C':'M')} ${ice?'ICE':'METAL'} · ${yl}${st}`,o.left<=0?TC.dim:ok?TC.ok:TC.warn,false,now)}
     // nearest unspent ice and metal off screen
     for(const want of['ice','metal']){const e=ranked.find(e=>e.o.type===want&&e.o.left>0);if(!e)continue;const [sx,sy]=toS(e.o.x,e.o.y);
       if(!vis(sx,sy,-20))tacEdge(sx,sy,`${want==='ice'?'ICE':'METAL'} ${fmt(Math.max(0,e.d))} m`,want==='ice'?'#8fdcff':'#ffc27a')}
     for(const o of L.deb){const d=Math.hypot(o.x-b.x,o.y-b.y);if(d>320)continue;const [sx,sy]=toS(o.x,o.y);if(!vis(sx,sy,20))continue;
       const s=Math.max(4,o.r*z+3);ctx.strokeStyle='rgba(255,120,90,.85)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(sx,sy-s);ctx.lineTo(sx+s,sy);ctx.lineTo(sx,sy+s);ctx.lineTo(sx-s,sy);ctx.closePath();ctx.stroke();
-      if(d<140){ctx.font='600 9.5px "IBM Plex Mono",monospace';ctx.fillStyle='rgba(255,140,110,.95)';ctx.textAlign='left';ctx.fillText(`DEBRIS ${Math.round(Math.hypot(o.vx-b.vx,o.vy-b.vy))} m/s`,sx+s+4,sy+3)}}
+      if(d<140&&!focus){ctx.font='600 9.5px "IBM Plex Mono",monospace';ctx.fillStyle='rgba(255,140,110,.95)';ctx.textAlign='left';ctx.fillText(`DEBRIS ${Math.round(Math.hypot(o.vx-b.vx,o.vy-b.vy))} m/s`,sx+s+4,sy+3)}}
     let ns=null,nd=1e9;
     for(const o of L.sats){const [sx,sy]=toS(o.x,o.y),d=Math.hypot(o.x-b.x,o.y-b.y);if(!vis(sx,sy,30))continue;tacBracket(sx,sy,Math.max(8,(o.kind==='old'?9:5)*z+5),TC.bad,o,now);if(d<nd){nd=d;ns=o}}
-    if(ns){const [sx,sy]=toS(ns.x,ns.y);tacLabel(sx,sy,Math.max(8,5*z+5),ns.kind==='old'?[`${tacId(ns,'SAT')} · DEFUNCT SAT`,'TUMBLING · NO CONTROL',`RNG ${fmt(nd)} m`]:[`${tacId(ns,'SL')} · STARLINK`,'ACTIVE · KEEP CLEAR',`RNG ${fmt(nd)} m · ${Math.round(Math.abs(ns.vx-b.vx))} m/s`],TC.bad)}
+    if(ns&&(!focus||nd<160)){const [sx,sy]=toS(ns.x,ns.y);tacLabel(sx,sy,Math.max(8,5*z+5),ns.kind==='old'?[`${tacId(ns,'SAT')} · DEFUNCT SAT`,'TUMBLING · NO CONTROL',`RNG ${fmt(nd)} m`]:[`${tacId(ns,'SL')} · STARLINK`,'ACTIVE · KEEP CLEAR',`RNG ${fmt(nd)} m · ${Math.round(Math.abs(ns.vx-b.vx))} m/s`],TC.bad)}
     threat=tacThreat([...L.ast.map(o=>({o,kind:'ast'})),...L.deb.map(o=>({o,kind:'deb'})),...L.sats.map(o=>({o,kind:'sat'}))],b,14,{ast:1.4,deb:1.2,sat:.5});
-    tacFlightMarkers(b,bx,by,sr+30,false,now);
+    if(!focus)tacFlightMarkers(b,bx,by,sr+30,false,now);
   }
   /* ----- powered flight: ascent, Mars landing, Earth return ----- */
   const flying=['launch','marsAscent','marsLand','reentry'].includes(S.phase)&&!b.grounded&&!(S.count>0);
@@ -2723,7 +2752,7 @@ function drawTac(z){
     ctx.strokeStyle=TC.bad;ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(sx,sy);ctx.stroke();ctx.setLineDash([]);
     tacBracket(sx,sy,Math.max(10,(threat.o.r||2)*z+8),TC.bad,null,now,bl);
     const what={ast:'ASTEROID',deb:'DEBRIS',sat:'SATELLITE'}[threat.kind];
-    tacChip(bx,Math.max(80,by-sr-30),`⚠ COLLISION ${threat.t.toFixed(1)}s · ${what} · ${Math.round(threat.rel)} m/s`,TC.bad,bl,now);
+    tacChip(bx,Math.max(80,by-sr-30),W<600?`⚠ ${what} ${threat.t.toFixed(1)}s`:`⚠ COLLISION ${threat.t.toFixed(1)}s · ${what} · ${Math.round(threat.rel)} m/s`,TC.bad,bl,now);
     tacBeepT-=1/60;if(tacBeepT<=0){tacBeepT=threat.t<2?.35:.8;sfx('beep')}
   }
 }
@@ -2853,7 +2882,7 @@ function frame(now){
       cam.z=cam.z?lerp(cam.z,zt,Math.min(1,dt*2.5)):zt;
       cam.lx=lerp(cam.lx??tx,tx,Math.min(1,dt*2.4));cam.ly=lerp(cam.ly??ty,ty,Math.min(1,dt*2.4));cam.x=cam.lx;cam.y=cam.ly;
     }else if(leo&&(S.phase==='leo'||S.phase==='coast')&&body){
-      const zt=sScale()*.72*userZoom;cam.z=cam.z?lerp(cam.z,zt,Math.min(1,dt*2.5)):zt;cam.x=body.x;cam.y=body.y;cam.lx=cam.ly=undefined;
+      const zt=Math.min(sScale()*.72*4.5*userZoom,leoZoomNeed());cam.z=cam.z?lerp(cam.z,zt,Math.min(1,dt*(zt<cam.z?3:1.2))):zt;cam.x=body.x;cam.y=body.y;cam.lx=cam.ly=undefined;
     }else if(body){
       cam.lx=cam.ly=undefined;
       const g=planet.ground(body.x);const alt=Math.max(0,body.y-g);
