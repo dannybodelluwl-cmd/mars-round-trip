@@ -1729,11 +1729,15 @@ function startSurface(){
 }
 function roverAction(){
   const m=mining;
-  if(m.rampDir)return{k:'none',label:'Ramp moving…'};
+  if(m.rampDir&&m.rover!=='out')return{k:'none',label:'Ramp moving…'};
   if(m.rover==='stowed')return{k:'deploy',label:'Deploy rover'};
   if(m.rover==='shelter')return{k:'exit',label:'Drive out'};
   const b=m.bg,sp=Math.hypot(b.vx,b.vy),load=b.cargo.ice+b.cargo.iron,r=rampGeo();
-  if(b.x>r.sx-2&&b.x<r.ex+4&&sp<2.5)return{k:'stow',label:'Stow rover'};
+  if(b.x>r.sx-8&&b.x<r.hx+16){
+    if(m.ramp<.02&&!m.rampDir)return{k:'ramp',label:'Open ramp'};
+    if(m.rampDir>0)return{k:'none',label:'Ramp opening…'};
+    if(m.ramp>.98&&b.x>r.sx-2&&b.x<r.ex+4&&sp<2.5)return{k:'stow',label:'Stow rover'};
+  }
   for(const d of m.deps){
     if(Math.abs(b.x-d.x)<d.w/2+2.5){
       if(d.left<=.05)return{k:'none',label:d.type==='sample'?'Tube collected':'Deposit used up'};
@@ -1750,7 +1754,8 @@ function roverAction(){
 }
 function roverDo(a){
   const m=mining;if(!m||!a)return;
-  if(a.k==='deploy'){m.rampDir=1;sfx('servo');callout('Opening the cargo ramp. Rover crew, you are clear to drive out.')}
+  if(a.k==='ramp'){m.rampDir=1;sfx('servo');toast('Ramp opening','var(--cool)')}
+  else if(a.k==='deploy'){m.rampDir=1;sfx('servo');callout('Opening the cargo ramp. Rover crew, you are clear to drive out.')}
   else if(a.k==='stow'){
     const c=m.bg.cargo;
     if(c.ice+c.iron>0){m.ref.ice+=c.ice;m.ref.iron+=c.iron;toast(`Stowed · ${Math.round(c.ice+c.iron)} t to the refinery`,'var(--ok)');c.ice=c.iron=0}
@@ -1778,7 +1783,10 @@ function mkRover(x){
 // Chassis plus two sprung wheel masses: each wheel rides a spring-damper strut, a stiff lateral link carries traction
 function stepRover(dt){
   const m=mining,b=m.bg,g=MARS.g;
-  {const r=rampGeo();if(b.lane&&(b.x>r.ex+3||m.ramp<.98))b.lane=false;rampLane=!!b.lane} // off the ramp foot: free to drive past the ship
+  {const r=rampGeo();
+    if(b.lane&&(b.x>r.ex+3||m.ramp<.98)){b.lane=false;if(b.exiting&&m.ramp>=1&&!m.rampDir){m.rampDir=-1;sfx('servo');toast('Ramp closing','var(--cool)')}b.exiting=false}
+    else if(!b.lane&&m.ramp>.98&&!m.rampDir&&b.x>r.ex-1&&b.x<r.ex+5&&b.vx<.3&&b.y<r.g+4)b.lane=true; // at the ramp foot heading in: drive up
+    rampLane=!!b.lane} // off the ramp foot: free to drive past the ship
   const ca=Math.cos(b.ang),sa=Math.sin(b.ang),rx=ca,ry=sa,ux=-sa,uy=ca;
   const thr=((keys.right?1:0)-(keys.left?1:0))*(m.slow>0?.35:1)*(m.stormOn?.55:1)*(m.bat<=0?.3:1)*(1+.15*colN('garage'));
   let fx=0,fy=-g*BG.mc,tq=0,any=false;
@@ -1823,7 +1831,8 @@ function stepSurface(dt){
   if(m.slow>0)m.slow-=dt;
   // ramp animation; the rover rolls out onto the bay floor once it's down
   if(m.rampDir){m.ramp=clamp(m.ramp+m.rampDir*dt/2.2,0,1);
-    if(m.rampDir>0&&m.ramp>=1){m.rampDir=0;const r=rampGeo();rampLane=true;m.bg=mkRover(r.hx-.4);m.bg.lane=true;m.rover='out';Object.assign(m.bg.cargo,{ice:0,iron:0,sample:0});}
+    if(m.rampDir>0&&m.ramp>=1&&m.rover!=='stowed')m.rampDir=0; // reopened for a returning rover
+    if(m.rampDir>0&&m.ramp>=1){m.rampDir=0;const r=rampGeo();rampLane=true;m.bg=mkRover(r.hx-.4);m.bg.lane=m.bg.exiting=true;m.rover='out';Object.assign(m.bg.cargo,{ice:0,iron:0,sample:0});}
     if(m.rampDir<0&&m.ramp<=0){m.rampDir=0}}
   if(m.rover==='out'&&m.bg){
     const b=m.bg;
@@ -1873,7 +1882,7 @@ function drawRamp(t){
   if(r.o>.02){ // open bay: lit interior
     ctx.fillStyle='#14171a';ctx.fillRect(r.hx-6,r.hy,6,RAMP.len*.95);
     ctx.save();ctx.globalCompositeOperation='lighter';const g=ctx.createLinearGradient(r.hx-6,0,r.hx,0);g.addColorStop(0,'rgba(255,230,170,.05)');g.addColorStop(1,`rgba(255,230,170,${(.4*r.o).toFixed(2)})`);ctx.fillStyle=g;ctx.fillRect(r.hx-6,r.hy,6,RAMP.len*.95);ctx.restore();
-    if(m.rover==='stowed'||m.rampDir>0){ctx.fillStyle='#e9ebe7';ctx.fillRect(r.hx-5.4,r.hy+.2,4.8,1.6)} // rover parked inside
+    if(m.rover==='stowed'){ctx.fillStyle='#e9ebe7';ctx.fillRect(r.hx-5.4,r.hy+.2,4.8,1.6)} // rover parked inside
   }
   // the ramp door itself
   ctx.strokeStyle='#8b9399';ctx.lineWidth=.55;ctx.beginPath();ctx.moveTo(r.hx,r.hy);ctx.lineTo(r.ex,r.ey);ctx.stroke();
