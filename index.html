@@ -735,7 +735,7 @@ function checkpoint(name){S.cp=clone(ship);S.cpPhase=name;saveGame();briefing(na
 function retry(){ship=clone(S.cp);setRocket(ship.rk||RK.id);buildEngChips();briefing(S.cpPhase)}
 
 function begin(name){
-  S.phase=name;S.paused=false;S.failing=false;S.catching=false;S.shear=S.flap=S.leak=S.devil=null;S.tile=1;S.blackout=0;S.f={};S.count=0;planAnomaly(name);
+  S.phase=name;S.paused=false;S.failing=false;S.catching=false;S.catchAnim=null;S.shear=S.flap=S.leak=S.devil=null;S.tile=1;S.blackout=0;S.f={};S.count=0;planAnomaly(name);
   document.body.classList.toggle('surface',name==='mining');$('sideL').hidden=name==='mining';$('zoom').hidden=name.startsWith('to');particles=[];debris=null;tr=null;mining=null;booms=[];if(!['marsLand','mining','marsAscent'].includes(name))colonists=null;S.sats=null;S.satT=undefined;if(name!=='leo')leo=null;
   for(const e of ship.engines){e.heat=0;e.firing=false}
   keys.thrust=keys.left=keys.right=false;
@@ -914,9 +914,7 @@ function flight(dt){
     const bot=b.y-half*Math.abs(Math.cos(b.ang));
     if(b.x-ext<TOWER_X1&&b.x+ext>TOWER_X0&&bot<TOWER_H){explode({t:'Hit the tower',d:'You clipped the launch tower. Come in over the launch mount, to the right of the tower.'});return}
     if((S.phase==='reentry'||S.phase==='school'&&S.school.step>=2)&&Math.abs(b.x)<8&&b.y>MOUNT_H+52&&b.y<MOUNT_H+92&&Math.abs(b.vy)<4.5&&Math.abs(b.vx)<3&&Math.abs(b.ang)<0.2){
-      S.phase='landed';S.catching=true;b.vx=b.vy=0;b.av=0;b.grounded=true;
-      for(const e of ship.engines)e.firing=false;
-      toast('Caught by the chopsticks!','var(--ok)');sfx('clunk');if(S.school){schoolDone(true);return}callout('Catch! The ship is in the arms. Welcome home.');win(Math.abs(b.x),true);return;
+      startCatch();return;
     }
   }
   // ground contact
@@ -1135,7 +1133,7 @@ function drawPreview(c,r){
   ctx=oc;setRocket(oR);ship=oS;Object.assign(LIGHT,oL);
 }
 function menu(){
-  S.phase='menu';S.paused=true;S.catching=false;$('zoom').hidden=true;document.body.classList.remove('surface');
+  S.phase='menu';S.paused=true;S.catching=false;S.catchAnim=null;$('zoom').hidden=true;document.body.classList.remove('surface');
   $('hud').hidden=true;$('ctl').hidden=true;$('mine').hidden=true;
   body={x:0,y:82,vx:0,vy:0,ang:0,av:0,stacked:true,grounded:true};planet=EARTH;booster=null;
   const draw=()=>{
@@ -1875,17 +1873,67 @@ function deluge(n){
   S.deluge=.3;
   for(let i=0;i<n&&particles.length<620;i++){const s=Math.random()<.5?-1:1;particles.push({x:s*rnd(8,14),y:MOUNT_H-1,vx:s*rnd(20,55),vy:rnd(2,16),life:rnd(1.2,2.8),max:2.8,size:rnd(2,5),col:Math.random()<.5?'#ffffff':'#e8eef3',smoke:true,grow:rnd(6,14)})}
 }
+/* ---------- the catch: arms preposition, swing in, take the load on shock absorbers ---------- */
+const CAR_REST=125;
+const towardV=(v,t,rate,dt)=>v+clamp(t-v,-rate*dt,rate*dt);
+function startCatch(){
+  const b=body;S.phase='landed';S.catching=true;b.grounded=true;
+  for(const e of ship.engines)e.firing=false;
+  const pins=b.y+12;if(S.carY>pins)S.carY=pins;
+  S.catchAnim={t:0,gap:Math.min(6,pins-S.carY),sp:Math.max(1.5,-b.vy),hit:false,base:0,d:0,v:0,x0:b.x,ang:b.ang,av:b.av*.5+b.vx*.04,done:false};
+  b.vx=b.vy=b.av=0;sfx('servo');
+  // engine shutdown: a puff of methane/oxygen vapour from the skirt
+  for(let i=0;i<26;i++)particles.push({x:b.x+rnd(-4,4),y:b.y-26,vx:rnd(-6,6),vy:rnd(-5,1),life:rnd(1.4,2.6),max:2.6,size:rnd(1.5,3.5),col:'#f2f6f9',smoke:true,grow:rnd(3,6)});
+}
+function stepTower(dt){
+  const b=body,c=S.catchAnim;
+  S.carY=S.carY??CAR_REST;S.arms=S.arms??0;
+  if(c){
+    c.t+=dt;S.arms=towardV(S.arms,1,2.6,dt);
+    if(!c.hit){ // arms closing as the ship settles the last metres onto the rails
+      c.gap-=c.sp*dt;
+      if(c.gap<=0){c.hit=true;c.gap=0;c.base=S.carY-1;c.d=1;c.v=-c.sp*1.1;c.t=0;
+        sfx('clunk');sfx('thud');S.shake=Math.max(S.shake||0,.55);toast('Caught by the chopsticks!','var(--ok)');
+        for(const s of[-1,1])for(let i=0;i<10;i++)particles.push({x:(b?b.x:0)+s*4.8,y:S.carY,vx:s*rnd(2,9),vy:rnd(-4,5),life:rnd(.25,.6),max:.6,size:rnd(.15,.35),col:i%2?'#ffd27a':'#ffffff',add:true})}
+    }else{ // carriage on its shock absorbers: dips, bounces once, settles under the load
+      const acc=-34*c.d-6.5*c.v;c.v+=acc*dt;c.d+=c.v*dt;S.carY=c.base+c.d}
+    // the ship hangs on its pins: pulled to centre by the arms, swinging a little, damped out
+    const aa=-38*c.ang-3.2*c.av;c.av+=aa*dt;c.ang+=c.av*dt;
+    if(b){b.y=S.carY+c.gap-12;b.x=c.hit?c.x0*Math.exp(-3.5*c.t):c.x0;b.ang=c.ang;b.vx=b.vy=0}
+        if(Math.random()<.08)particles.push({x:(b?b.x:0)+rnd(-4,4),y:(b?b.y:0)-24,vx:rnd(-1,1),vy:rnd(-1.5,.5),life:1.6,max:1.6,size:rnd(1,2),col:'#eef3f6',smoke:true,grow:2.5}); // boil-off venting
+    if(c.hit&&c.t>2.4&&!c.done){c.done=true;if(S.school)schoolDone(true);else{callout('Catch! The ship is in the arms. Welcome home.');win(Math.abs(c.x0),true)}}
+    return;
+  }
+  // approach: preposition the carriage under the ship's catch pins and swing the arms part-closed
+  const coming=b&&!b.dead&&!b.grounded&&(S.phase==='reentry'||S.phase==='school'&&S.school&&S.school.step>=2)&&Math.abs(b.x)<80&&b.y<MOUNT_H+320;
+  let ty=CAR_REST,ta=0;
+  if(coming){ty=clamp(b.y+12-3,MOUNT_H+60,MOUNT_H+104);if(Math.abs(b.x)<14&&b.y+12-S.carY<26)ta=.45}
+  S.carY=towardV(S.carY,ty,5,dt);S.arms=towardV(S.arms,ta,.7,dt);
+}
+// one arm in side view: a tapered truss swinging about the carriage hinge; open = swung toward/away from the viewer
+function chopArm(cy,a,front){
+  const L=TOWER_X1*-1+16,len=lerp(13,L,a),x0=TOWER_X1,x1=x0+len,dy=front?0:.9,h0=2.6,h1=1.5;
+  const yt=y=>cy+dy+y;
+  const g=ctx.createLinearGradient(0,yt(-h0),0,yt(h0));
+  if(front){g.addColorStop(0,'#8a939a');g.addColorStop(.5,'#4f575e');g.addColorStop(1,'#2a2f34')}else{g.addColorStop(0,'#4c535a');g.addColorStop(1,'#1e2226')}
+  ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(x0,yt(h0*.6));ctx.lineTo(x1,yt(h1*.5));ctx.lineTo(x1,yt(-h1*.6));ctx.lineTo(x0,yt(-h0*.7));ctx.closePath();ctx.fill();
+  if(front&&pxPerM()>1.4){ctx.strokeStyle='rgba(20,24,28,.6)';ctx.lineWidth=.12;ctx.beginPath();const n=Math.max(3,len/3.2|0);
+    for(let i=0;i<n;i++){const xa=x0+len*i/n,xb=x0+len*(i+1)/n,ta=h0*.6+(h1*.5-h0*.6)*i/n,tb=h0*.6+(h1*.5-h0*.6)*(i+1)/n,ba=-h0*.7+(-h1*.6+h0*.7)*i/n,bb=-h0*.7+(-h1*.6+h0*.7)*(i+1)/n;ctx.moveTo(xa,yt(ba));ctx.lineTo(xb,yt(tb));ctx.moveTo(xb,yt(bb));ctx.lineTo(xb,yt(tb))}ctx.stroke()}
+  // catch rail along the top with its yellow bumper, and the hydraulic actuator back to the carriage
+  ctx.fillStyle=front?'#c9ced2':'#6a7178';ctx.fillRect(x0+len*.45,yt(h1*.5),len*.55,.35);
+  ctx.fillStyle='#ffc23d';ctx.fillRect(x1-1,yt(-h1*.6),1,h1*1.1+.35);
+  if(front){ctx.strokeStyle='#9aa2a8';ctx.lineWidth=.45;ctx.beginPath();ctx.moveTo(TOWER_X0+2,yt(-3.6));ctx.lineTo(x0+len*.32,yt(-h0*.4));ctx.stroke();ctx.strokeStyle='#d4d8db';ctx.lineWidth=.22;ctx.beginPath();ctx.moveTo(x0+len*.12,yt(-2.5));ctx.lineTo(x0+len*.32,yt(-h0*.4));ctx.stroke()}
+}
+function drawChopsticksBack(){const cy=S.carY||CAR_REST,a=S.arms||0;chopArm(cy,a,false)}
 function drawChopsticks(){
-  const cy=S.carY||125,a=S.arms||0;
-  // carriage
-  ctx.fillStyle='#2f353b';ctx.fillRect(TOWER_X0-1,cy-5,TOWER_X1-TOWER_X0+2,8);
-  ctx.fillStyle='#ffc23d';ctx.fillRect(TOWER_X0-1,cy-5,TOWER_X1-TOWER_X0+2,.5);
-  // arms: open = swung toward the viewer (foreshortened), closed = full length around the ship
-  const len=lerp(13,TOWER_X1*-1+16,a);
-  const g=ctx.createLinearGradient(0,cy-2,0,cy+2);g.addColorStop(0,'#7b848c');g.addColorStop(.5,'#4b535a');g.addColorStop(1,'#2b3035');
-  ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(TOWER_X1,cy+2.2);ctx.lineTo(TOWER_X1+len,cy+1);ctx.lineTo(TOWER_X1+len,cy-1.2);ctx.lineTo(TOWER_X1,cy-2.2);ctx.closePath();ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=.12;ctx.beginPath();ctx.moveTo(TOWER_X1,cy+2.2);ctx.lineTo(TOWER_X1+len,cy+1);ctx.stroke();
-  ctx.fillStyle='#ffc23d';ctx.fillRect(TOWER_X1+len-1.4,cy-1.2,1.4,2.2);
+  const cy=S.carY||CAR_REST,a=S.arms||0;
+  // carriage: wraps the tower, rides on rollers, cable sheaves on top
+  ctx.fillStyle='#2f353b';ctx.fillRect(TOWER_X0-1.2,cy-5.5,TOWER_X1-TOWER_X0+2.4,9);
+  ctx.fillStyle='#454c53';for(let x=TOWER_X0;x<TOWER_X1;x+=2.6)ctx.fillRect(x,cy-4.6,1.6,7);
+  ctx.fillStyle='#ffc23d';ctx.fillRect(TOWER_X0-1.2,cy+3.3,TOWER_X1-TOWER_X0+2.4,.35);
+  ctx.fillStyle='#1b1f22';for(const x of[TOWER_X0+2,TOWER_X1-2]){ctx.beginPath();ctx.arc(x,cy+4.1,.8,0,6.283);ctx.fill()}
+  ctx.strokeStyle='rgba(30,30,30,.6)';ctx.lineWidth=.12;ctx.beginPath();ctx.moveTo(TOWER_X0+2,cy+4.9);ctx.lineTo(TOWER_X0+2,TOWER_H);ctx.moveTo(TOWER_X1-2,cy+4.9);ctx.lineTo(TOWER_X1-2,TOWER_H);ctx.stroke();
+  chopArm(cy,a,true);
 }
 
 /* ---------- surface ops: pressurised rover + ISRU refinery ---------- */
@@ -2685,6 +2733,7 @@ function drawWorld(z){
   }
   ctx.globalAlpha=1;
   drawBooms();
+  if(planet===EARTH&&!inLeo)drawChopsticksBack();
   // rocket shadow and engine light on the ground
   if(body&&!body.dead){
     const gy=planet.ground(body.x),alt=body.y-gy-(body.stacked?60:25);
@@ -3136,8 +3185,7 @@ function frameInner(now){
   if(keys.zin)zoomBy(1+dt*1.8);if(keys.zout)zoomBy(1/(1+dt*1.8));
   if(planet===EARTH&&body){
     const qdT=(S.phase==='launch'||S.phase==='menu')&&body.grounded?1:0;S.qd=lerp(S.qd??1,qdT,Math.min(1,dt*3));
-    S.carY=lerp(S.carY??125,S.catching?body.y+12:125,Math.min(1,dt*2));
-    S.arms=lerp(S.arms||0,S.catching?1:0,Math.min(1,dt*(S.catching?2.5:4)));
+    stepTower(dt);
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)$('toast').classList.remove('on')}
   if(!S.paused){
