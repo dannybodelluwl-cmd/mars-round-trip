@@ -255,7 +255,7 @@ const cv=document.getElementById('cv');let ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
 let W=0,H=0,DPR=1;
 function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=cv.clientWidth;H=cv.clientHeight;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR)}
-addEventListener('resize',resize);resize();
+addEventListener('resize',resize);resize();try{new ResizeObserver(()=>{if(cv.clientWidth!==W||cv.clientHeight!==H)resize()}).observe(cv)}catch(e){}
 
 const clamp=(v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*t, rnd=(a,b)=>a+Math.random()*(b-a);
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -1729,7 +1729,7 @@ function launchMount(cx,t,deluge){
 }
 function palm(x,h){ctx.strokeStyle='#6b5a3a';ctx.lineWidth=.5;ctx.beginPath();ctx.moveTo(x,0);ctx.quadraticCurveTo(x+1,h*.6,x+.6,h);ctx.stroke();ctx.strokeStyle='#4f6b2f';ctx.lineWidth=.45;for(let k=0;k<6;k++){const a=k/6*Math.PI*2;ctx.beginPath();ctx.moveTo(x+.6,h);ctx.quadraticCurveTo(x+.6+Math.cos(a)*2,h+1,x+.6+Math.cos(a)*3.4,h-1.2-Math.abs(Math.sin(a)));ctx.stroke()}}
 // screen pixels per world metre right now, for level-of-detail decisions
-const pxPerM=()=>Math.abs(ctx.getTransform().a)/DPR;
+const pxPerM=()=>{try{return Math.abs(ctx.getTransform().a)/DPR}catch(e){return cam.z||1}};
 function wText(str,x,y,size,col,align,weight){ctx.save();ctx.scale(1,-1);ctx.font=`${weight||700} ${size}px "Barlow","Arial Narrow",sans-serif`;ctx.textAlign=align||'left';ctx.fillStyle=col;ctx.fillText(str,x,-y);ctx.restore()}
 // Factory buildings: corrugated cladding, girt seams, roof plant, roll-up doors with a lit interior, signage, stairs
 function bay(x,w,h,col,opts={}){
@@ -3111,7 +3111,26 @@ function hud(){
 
 /* ---------- loop ---------- */
 let last=performance.now();
+// Resilience: a drawing error must never freeze the game, and a lost graphics context (GPU reset, sleep,
+// memory pressure) must come back with its textures rebuilt instead of leaving a black screen.
+let glitchT=0,ctxLost=false;
+function resetGfx(){for(const k in TEX)delete TEX[k];groundPat={};try{resize()}catch(e){}}
+cv.addEventListener('contextlost',e=>{e.preventDefault();ctxLost=true});
+cv.addEventListener('contextrestored',()=>{ctxLost=false;resetGfx()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ctx.isContextLost&&!ctx.isContextLost()&&ctxLost){ctxLost=false;resetGfx()}});
 function frame(now){
+  try{
+    if(ctx.isContextLost&&ctx.isContextLost()){ctxLost=true;requestAnimationFrame(frame);return}
+    if(ctxLost){ctxLost=false;resetGfx()}
+    frameInner(now);
+  }catch(err){
+    console.error('[Mars Round Trip] frame error',err);
+    try{if(ctx.reset)ctx.reset();else cv.width=cv.width;ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over'}catch(e){}
+    if(++glitchT===3)resetGfx();
+    requestAnimationFrame(frame);
+  }
+}
+function frameInner(now){
   const dt=Math.min(0.033,(now-last)/1000);last=now;
   thrEdge=keys.thrust&&!prevThr;prevThr=keys.thrust;
   if(keys.zin)zoomBy(1+dt*1.8);if(keys.zout)zoomBy(1/(1+dt*1.8));
