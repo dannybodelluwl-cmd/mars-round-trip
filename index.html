@@ -129,8 +129,8 @@ button:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 #capcom.alert b{color:var(--bad)}
 body.surface #capcom{bottom:calc(178px + env(safe-area-inset-bottom,0px))}
 .tr{display:flex;gap:8px;align-items:flex-start}
-#snd{pointer-events:auto;white-space:nowrap;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,18,.6);border-radius:6px;font-size:9.5px;letter-spacing:.1em;padding:4px 6px;color:#dfe6ec}
-#snd.off{color:var(--dim)}
+#snd,#tac{pointer-events:auto;white-space:nowrap;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,18,.6);border-radius:6px;font-size:9.5px;letter-spacing:.1em;padding:4px 6px;color:#dfe6ec}
+#snd.off,#tac.off{color:var(--dim)}
 #toast.big{font-size:clamp(48px,16vw,96px);top:26%}
 .cargo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 @media (min-width:560px){.cargo{grid-template-columns:repeat(4,minmax(0,1fr))}}
@@ -164,7 +164,7 @@ body.surface #capcom{bottom:calc(178px + env(safe-area-inset-bottom,0px))}
   <div id="hud" hidden>
     <div class="top">
       <div id="ph">Earth Ascent<small id="obj"></small></div>
-      <div class="tr"><div id="clock">T+00:00</div><button id="snd" aria-label="Toggle sound">SOUND</button></div>
+      <div class="tr"><div id="clock">T+00:00</div><button id="tac" aria-label="Toggle tactical HUD">HUD</button><button id="snd" aria-label="Toggle sound">SOUND</button></div>
     </div>
     <div class="side left" id="sideL">
       <div class="cell" id="rA"><span class="k" id="kA">ALT</span><b id="vA">0</b><small id="tA"></small></div>
@@ -1120,6 +1120,7 @@ $('bLaunch').addEventListener('click',launchFromMars);
 function updSnd(){const b=$('snd');b.textContent=AU.on?'SOUND ON':'SOUND OFF';b.classList.toggle('off',!AU.on);if(!AU.on)try{speechSynthesis.cancel()}catch(e){}}
 $('snd').addEventListener('click',()=>{AU.on=!AU.on;auSave();updSnd();auInit()});
 updSnd();
+$('tac').addEventListener('click',()=>setTac(!TAC));
 const KMAP={KeyM:'mine',Equal:'zin',NumpadAdd:'zin',Minus:'zout',NumpadSubtract:'zout',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'thrust',KeyW:'thrust',Space:'thrust'};
 addEventListener('keydown',e=>{
   if(!$('ov').hidden){if(e.code==='Enter'||e.code==='Space'){const b=$('card').querySelector('.btn');if(b){e.preventDefault();b.click()}}return}
@@ -1127,6 +1128,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyE'&&!e.repeat)cycleMode();
   if(e.code==='KeyS'&&!e.repeat)stage();
   if(e.code==='KeyP'&&!e.repeat)deployChute();
+  if(e.code==='KeyH'&&!e.repeat)setTac(!TAC);
   if(e.code==='KeyL'&&S.phase==='mining')launchFromMars();
 });
 addEventListener('keyup',e=>{if(KMAP[e.code]){keys[KMAP[e.code]]=false;if(mining)mining.digging=false}});
@@ -2496,6 +2498,7 @@ function drawWorld(z){
   if(planet===MARS&&!inLeo&&stormK()>0){const k=stormK();ctx.fillStyle=`rgba(150,85,50,${(k*.55).toFixed(3)})`;ctx.fillRect(0,0,W,H);
     ctx.strokeStyle=`rgba(230,170,120,${(.35*k).toFixed(3)})`;ctx.lineWidth=1;const tt=performance.now()/1000;
     for(let i=0;i<60*k;i++){const y=(i*97.13)%H,x=((i*233.7+tt*(500+i*7))%(W+120))-60;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+40,y+6);ctx.stroke()}}
+  drawTac(z);
   if(S.flash>0){ctx.fillStyle=`rgba(255,240,215,${(Math.min(1,S.flash)*.55).toFixed(3)})`;ctx.fillRect(0,0,W,H)}
 }
 const sScale=()=>Math.min(W,H*0.8)/420;
@@ -2545,6 +2548,187 @@ function drawTransfer(){
     ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(sx,sy,2.5,0,6.283);ctx.fill();
   }
 }
+
+/* ---------- tactical HUD: identifies what's around you and makes the cues obvious. Information only: no autopilot ---------- */
+let TAC=true;try{TAC=localStorage.getItem('mrt.tac')!=='0'}catch(e){}
+const TC={c:'#7fe8ff',ok:'#62de88',warn:'#ffc23d',bad:'#ff4b4b',dim:'rgba(170,190,205,.75)'};
+let tacBeepT=0;
+function tacId(o,pre){if(!o._id)o._id=pre+'-'+(100+Math.floor(Math.random()*900));return o._id}
+function tacBracket(sx,sy,r,col,o,now,blink){
+  if(o&&!o._lk)o._lk=now;
+  const k=o?clamp((now-o._lk)/.35,0,1):1,rr=r*(1+1.6*(1-k)),l=Math.max(5,rr*.42);
+  if(blink&&((now*6)|0)%2)return;
+  ctx.strokeStyle=col;ctx.lineWidth=1.4;ctx.globalAlpha=.5+.5*k;ctx.beginPath();
+  for(const [dx,dy] of[[-1,-1],[1,-1],[1,1],[-1,1]]){const cx=sx+dx*rr,cy=sy+dy*rr;ctx.moveTo(cx,cy-dy*l);ctx.lineTo(cx,cy);ctx.lineTo(cx-dx*l,cy)}
+  ctx.stroke();ctx.globalAlpha=1;
+}
+function tacLabel(sx,sy,r,lines,col){
+  ctx.font='600 10.5px "IBM Plex Mono",monospace';
+  const w=Math.max(...lines.map(l=>ctx.measureText(typeof l==='string'?l:l.t).width))+10,h=lines.length*13+5;
+  let left=sx+r+16+w>W-112;if(left&&sx-r-16-w<112)left=false;
+  if(sx<104||sx>W-104||sy<70||sy>H-150)return; // keep labels off the side panels and controls
+  const ex=left?sx-r*.7:sx+r*.7,ey=sy-r*.7,ly=clamp(sy-r-16,70+h,H-150);
+  const bx=clamp(left?sx-r-16-w:sx+r+16,112,W-112-w),lx=left?bx+w:bx;
+  ctx.strokeStyle=col;ctx.lineWidth=1;ctx.globalAlpha=.75;ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(lx,ly);ctx.stroke();ctx.globalAlpha=1;
+  ctx.fillStyle='rgba(3,9,15,.62)';ctx.fillRect(bx,ly-h+4,w,h);
+  ctx.fillStyle=col;ctx.fillRect(left?bx+w-2:bx,ly-h+4,2,h);
+  ctx.textAlign='left';
+  lines.forEach((l,i)=>{const t=typeof l==='string'?l:l.t;ctx.fillStyle=typeof l==='string'?(i?TC.dim:col):l.c;ctx.font=(i?'500 10px':'700 10.5px')+' "IBM Plex Mono",monospace';ctx.fillText(t,bx+6,ly-h+16+i*13)});
+}
+function tacChip(x,y,text,col,blink,now){
+  if(blink&&((now*4)|0)%2)return;
+  ctx.font='800 13px "Saira Condensed","Arial Narrow",sans-serif';const w=ctx.measureText(text).width+16;
+  ctx.fillStyle='rgba(3,9,15,.7)';ctx.fillRect(x-w/2,y-12,w,20);ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.strokeRect(x-w/2+.5,y-11.5,w-1,19);
+  ctx.fillStyle=col;ctx.textAlign='center';ctx.fillText(text,x,y+3);
+}
+function tacEdge(sx,sy,text,col){ // off-screen pointer clamped to the screen edge
+  const cx=W/2,cy=H*.45,dx=sx-cx,dy=sy-cy,mx=W/2-(W<600?26:130),my=H*.45-(W<600?150:80),s=Math.min(Math.abs(mx/(dx||1e-6)),Math.abs(my/(dy||1e-6)),1),x=cx+dx*s,y=cy+dy*s,a=Math.atan2(dy,dx);
+  ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-4,-7);ctx.lineTo(-4,7);ctx.closePath();ctx.fill();ctx.restore();
+  ctx.font='600 10.5px "IBM Plex Mono",monospace';ctx.fillStyle=col;ctx.textAlign=Math.cos(a)>.3?'right':Math.cos(a)<-.3?'left':'center';
+  ctx.fillText(text,x-Math.cos(a)*16,y-Math.sin(a)*16+4);
+}
+// closest approach of each object to the ship over the next few seconds
+function tacThreat(list,b,clear,minRel){
+  let best=null;
+  for(const {o,kind} of list){if(o.dead)continue;
+    const px=o.x-b.x,py=o.y-b.y,vx=(o.vx||0)-b.vx,vy=(o.vy||0)-b.vy,v2=vx*vx+vy*vy,rel=Math.sqrt(v2);
+    if(rel<minRel[kind])continue;
+    const t=-(px*vx+py*vy)/v2;if(t<0||t>6)continue;
+    const mx=px+vx*t,my=py+vy*t,miss=Math.hypot(mx,my);
+    if(miss<(o.r||1)+clear&&(!best||t<best.t))best={o,kind,t,rel};
+  }
+  return best;
+}
+function tacFlightMarkers(b,bx,by,sr,retro,now){ // velocity (flight-path) marker, plus retrograde when landing
+  const v=Math.hypot(b.vx,b.vy);if(v<2)return;
+  const ux=b.vx/v,uy=-b.vy/v,r=sr+26;
+  const px=bx+ux*r,py=by+uy*r;
+  ctx.strokeStyle=TC.ok;ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(px,py,5,0,6.283);ctx.moveTo(px-11,py);ctx.lineTo(px-5,py);ctx.moveTo(px+5,py);ctx.lineTo(px+11,py);ctx.moveTo(px,py-5);ctx.lineTo(px,py-10);ctx.stroke();
+  ctx.font='600 9.5px "IBM Plex Mono",monospace';ctx.fillStyle=TC.ok;ctx.textAlign='center';ctx.fillText(`VEL ${Math.round(v)}`,px,py+18);
+  if(retro){const qx=bx-ux*r,qy=by-uy*r,nx=Math.sin(b.ang),ny=-Math.cos(b.ang),good=nx*-ux+ny*-uy>.97;
+    ctx.strokeStyle=good?TC.ok:TC.warn;ctx.beginPath();ctx.arc(qx,qy,5,0,6.283);ctx.moveTo(qx-3.5,qy-3.5);ctx.lineTo(qx+3.5,qy+3.5);ctx.moveTo(qx+3.5,qy-3.5);ctx.lineTo(qx-3.5,qy+3.5);ctx.stroke();
+    ctx.fillStyle=good?TC.ok:TC.warn;ctx.fillText('RETRO',qx,qy+18)}
+  // where the nose points
+  const hx=Math.sin(b.ang),hy=-Math.cos(b.ang);ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(bx+hx*(r-6),by+hy*(r-6));ctx.lineTo(bx+hx*(r+8),by+hy*(r+8));ctx.stroke();
+}
+// ballistic prediction (gravity + drag at the current attitude, engines off) to the ground
+function tacImpact(b){
+  const P=planet,half=25;let x=b.x,y=b.y,vx=b.vx,vy=b.vy,t=0;const pts=[];
+  const v0=Math.hypot(vx,vy)||1,aoa=Math.abs(Math.sin(Math.atan2(vx,vy)-b.ang)),cd=P===MARS?0.0004+0.0016*aoa:0.0003+0.0022*aoa;
+  for(let i=0;i<900;i++){
+    const v=Math.hypot(vx,vy)||1,dr=P.dens(y-P.ground(x))*v*v*cd;
+    vx-=dr*vx/v*.1;vy+=(-P.g-dr*vy/v)*.1;x+=vx*.1;y+=vy*.1;t+=.1;
+    if(i%4===0)pts.push([x,y]);
+    if(y-half<=P.ground(x))return{x,t,pts};
+  }
+  return null;
+}
+function tacZone(x){
+  if(planet===MARS){if(colN('pad')&&x>PAD_X0&&x<PAD_X1)return['LANDING PAD',TC.ok];if(modAt(x,false,4))return['BASE MODULE · NO',TC.bad];const z=zoneAt(x);return z?(z.ice?['ICE FIELD',TC.ok]:['FLAT ZONE',TC.warn]):['BOULDERS · NO',TC.bad]}
+  return Math.abs(x)<70?['STARBASE PAD',TC.ok]:x>260?['GULF · WATER',TC.bad]:['SCRUB · OFF PAD',TC.warn];
+}
+function tacThrust(b){ // what the engines could do right now, straight up, minus gravity
+  let a=0;const dens=planet.dens(b.y-planet.ground(b.x)),atm=dens>0.25;
+  for(const e of ship.engines)if(!e.dmg&&(mode==='ALL'||mode===e.type))a+=e.type==='SL'?ENG.SL.thrust:(atm?ENG.VAC.thrustAtm:ENG.VAC.thrustVac);
+  return a*RK.thrust*(1+0.35*(1-ship.fuel/100))*Math.max(0,Math.cos(b.ang))-planet.g;
+}
+function drawTac(z){
+  if(!TAC||!body||body.dead||!ship)return;
+  const now=performance.now()/1000,b=body,toS=(x,y)=>[W/2+(x-cam.x)*z,H*.42-(y-cam.y)*z];
+  const [bx,by]=toS(b.x,b.y),sr=(b.stacked?64:28)*Math.max(z,.3*sScale());
+  const vis=(sx,sy,m)=>sx>-m&&sx<W+m&&sy>-m&&sy<H+m;
+  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.lineCap='butt';
+  let threat=null;
+  /* ----- low Earth orbit: classify every rock, flag debris and satellites ----- */
+  if(leo&&S.phase==='leo'){
+    const L=leo,ranked=L.ast.map(o=>({o,d:Math.hypot(o.x-b.x,o.y-b.y)-o.r})).sort((a,c)=>a.d-c.d),full=new Set(ranked.slice(0,3).map(e=>e.o));
+    for(const {o,d} of ranked){const [sx,sy]=toS(o.x,o.y),r=Math.max(9,o.r*z*(.55+.45*clamp(o.left/o.max,0,1)))+4;
+      if(!vis(sx,sy,r+40))continue;
+      const ice=o.type==='ice',spent=o.left<=0,col=spent?'rgba(150,160,170,.7)':ice?'#8fdcff':'#ffc27a',rv=Math.hypot(b.vx-o.vx,b.vy-o.vy);
+      tacBracket(sx,sy,r,col,o,now);
+      const lines=[`${tacId(o,ice?'C':'M')} · ${ice?'C-TYPE · WATER ICE':'M-TYPE · NICKEL-IRON'}`];
+      if(full.has(o)){
+        lines.push(spent?'DEPLETED':ice?`YIELD ≈ +${Math.round(Math.min(o.left*.42,99))}% FUEL`:`YIELD ≈ ${Math.max(1,Math.round(o.left/22))} REPAIR KIT${o.left/22>=1.5?'S':''}`);
+        lines.push(`RNG ${fmt(Math.max(0,d))} m · REL ${rv.toFixed(1)} m/s`);
+        if(!spent&&d<28)lines.push(rv>2.5?{t:`▲ MATCH SPEED · ${rv.toFixed(1)} › 2.5`,c:TC.warn}:{t:'● IN RANGE · HOLD MINE',c:TC.ok});
+      }
+      tacLabel(sx,sy,r,lines,col);
+    }
+    // nearest unspent ice and metal off screen
+    for(const want of['ice','metal']){const e=ranked.find(e=>e.o.type===want&&e.o.left>0);if(!e)continue;const [sx,sy]=toS(e.o.x,e.o.y);
+      if(!vis(sx,sy,-20))tacEdge(sx,sy,`${want==='ice'?'ICE':'METAL'} ${fmt(Math.max(0,e.d))} m`,want==='ice'?'#8fdcff':'#ffc27a')}
+    for(const o of L.deb){const d=Math.hypot(o.x-b.x,o.y-b.y);if(d>320)continue;const [sx,sy]=toS(o.x,o.y);if(!vis(sx,sy,20))continue;
+      const s=Math.max(4,o.r*z+3);ctx.strokeStyle='rgba(255,120,90,.85)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(sx,sy-s);ctx.lineTo(sx+s,sy);ctx.lineTo(sx,sy+s);ctx.lineTo(sx-s,sy);ctx.closePath();ctx.stroke();
+      if(d<140){ctx.font='600 9.5px "IBM Plex Mono",monospace';ctx.fillStyle='rgba(255,140,110,.95)';ctx.textAlign='left';ctx.fillText(`DEBRIS ${Math.round(Math.hypot(o.vx-b.vx,o.vy-b.vy))} m/s`,sx+s+4,sy+3)}}
+    let ns=null,nd=1e9;
+    for(const o of L.sats){const [sx,sy]=toS(o.x,o.y),d=Math.hypot(o.x-b.x,o.y-b.y);if(!vis(sx,sy,30))continue;tacBracket(sx,sy,Math.max(8,(o.kind==='old'?9:5)*z+5),TC.bad,o,now);if(d<nd){nd=d;ns=o}}
+    if(ns){const [sx,sy]=toS(ns.x,ns.y);tacLabel(sx,sy,Math.max(8,5*z+5),ns.kind==='old'?[`${tacId(ns,'SAT')} · DEFUNCT SAT`,'TUMBLING · NO CONTROL',`RNG ${fmt(nd)} m`]:[`${tacId(ns,'SL')} · STARLINK`,'ACTIVE · KEEP CLEAR',`RNG ${fmt(nd)} m · ${Math.round(Math.abs(ns.vx-b.vx))} m/s`],TC.bad)}
+    threat=tacThreat([...L.ast.map(o=>({o,kind:'ast'})),...L.deb.map(o=>({o,kind:'deb'})),...L.sats.map(o=>({o,kind:'sat'}))],b,14,{ast:1.4,deb:1.2,sat:.5});
+    tacFlightMarkers(b,bx,by,sr+30,false,now);
+  }
+  /* ----- powered flight: ascent, Mars landing, Earth return ----- */
+  const flying=['launch','marsAscent','marsLand','reentry'].includes(S.phase)&&!b.grounded&&!(S.count>0);
+  if(flying){
+    const P=planet,alt=b.y-P.ground(b.x)-(b.stacked?60:25),dens=P.dens(b.y-P.ground(b.x)),landing=S.phase==='marsLand'||(S.phase==='reentry'&&alt<520);
+    tacFlightMarkers(b,bx,by,sr,landing,now);
+    const cues=[];
+    if(S.phase==='launch'&&b.stacked){
+      if(booster.fuel<=0)cues.push(['▲ STAGE NOW · S',TC.warn,1]);
+      else if(booster.fuel<12)cues.push([`BOOSTER ${Math.round(booster.fuel)}% · STAGE SOON`,TC.warn]);
+      if(booster.heat>75)cues.push([`BOOSTER HOT ${Math.round(booster.heat)}° · EASE OFF`,TC.bad,1]);
+      if(S.f.qmax&&!S.f.maxq&&dens*Math.hypot(b.vx,b.vy)**2>1400)cues.push(['MAX Q · HIGH TURBULENCE',TC.warn]);
+    }
+    if(!b.stacked){
+      const hot=ship.engines.filter(e=>!e.dmg&&e.heat>75);if(hot.length)cues.push([`${hot.map(e=>e.type).filter((t,i,a)=>a.indexOf(t)===i).join('+')} ENGINE HOT · ${Math.round(Math.max(...hot.map(e=>e.heat)))}°`,TC.bad,1]);
+      if(!landing&&S.phase!=='reentry'){
+        if(dens>0.25&&mode!=='SL')cues.push(['VAC IN THICK AIR · OVERHEATS',TC.warn]);
+        else if(dens<0.08&&mode==='SL'&&ship.engines.some(e=>e.type==='VAC'&&!e.dmg))cues.push(['THIN AIR · VAC IS MORE EFFICIENT · E',TC.c]);
+      }
+    }
+    if(S.phase==='reentry'&&alt>=520){const sh=b.shield||0;cues.push([`BELLY-FLOP · SHIELD ${sh>.85?'ON AIRFLOW':sh>.5?'PARTIAL':'EXPOSED'}`,sh>.85?TC.ok:sh>.5?TC.warn:TC.bad,sh<=.5]);if(b.hull>60)cues.push([`HULL TEMP ${Math.round(b.hull)}%`,TC.bad,1])}
+    // impact prediction for descents
+    if((S.phase==='marsLand'||S.phase==='reentry')&&!b.chute&&b.vy<0){
+      const ip=tacImpact(b);
+      if(ip){const gy=P.ground(ip.x),[ix,iy]=toS(ip.x,gy),[zn,zc]=tacZone(ip.x);
+        ctx.fillStyle=zc;ctx.globalAlpha=.55;for(const [x,y] of ip.pts){const [px,py]=toS(x,y);if(vis(px,py,0))ctx.fillRect(px-1,py-1,2,2)}ctx.globalAlpha=1;
+        if(vis(ix,iy,-10)){ctx.strokeStyle=zc;ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(ix,iy-2,9,Math.PI,0);ctx.moveTo(ix-6,iy-8);ctx.lineTo(ix+6,iy+4);ctx.moveTo(ix+6,iy-8);ctx.lineTo(ix-6,iy+4);ctx.stroke();
+          ctx.font='700 10.5px "IBM Plex Mono",monospace';ctx.fillStyle=zc;ctx.textAlign='center';ctx.fillText(`IMPACT ${ip.t.toFixed(0)}s · ${zn}`,ix,iy-16)}
+        else tacEdge(ix,iy,`IMPACT · ${zn}`,zc);
+      }
+    }
+    // touchdown limits and the landing-burn cue
+    if(landing&&!b.chute&&alt<900){
+      const onPad=S.phase==='marsLand'&&colN('pad')&&b.x>PAD_X0&&b.x<PAD_X1,lim=onPad?[7.5,5.5,.36]:[5.5,4,.26];
+      const row=(lab,val,max,unit)=>{const k=val/max;return{t:`${lab} ${val.toFixed(1).padStart(5)} / ${max}${unit}`,c:k<=.8?TC.ok:k<=1?TC.warn:TC.bad}};
+      const tilt=Math.abs(b.ang)*57.3;
+      const rows=['TOUCHDOWN LIMITS',row('V↓',Math.max(0,-b.vy),lim[0],''),row('H↔',Math.abs(b.vx),lim[1],''),{t:`TILT ${tilt.toFixed(0).padStart(4)}° / ${Math.round(lim[2]*57.3)}°`,c:tilt<=lim[2]*57.3*.8?TC.ok:tilt<=lim[2]*57.3?TC.warn:TC.bad}];
+      tacLabel(bx,by,sr*.6,rows,TC.c);
+      const net=tacThrust(b),h=Math.max(1,alt),vd=Math.max(0,-b.vy);
+      if(vd>3){const need=vd*vd/(2*h);
+        if(net<=.2)cues.push([Math.abs(b.ang)>.5?'FLIP UPRIGHT FOR LANDING BURN':'NOT ENOUGH THRUST · CHECK ENGINES',TC.bad,1]);
+        else if(need>net*.85)cues.push([`▼ LANDING BURN NOW · ${Math.round(vd)} m/s`,TC.bad,1]);
+        else if(need>net*.55)cues.push([`LANDING BURN IN ~${Math.max(1,Math.round((h-vd*vd/(2*net*.85))/vd))}s`,TC.warn]);
+      }
+    }
+    cues.forEach(([t,c,bl],i)=>tacChip(bx,Math.min(H-120,by+sr+40+i*24),t,c,bl,now));
+    if(S.sats&&S.sats.length){
+      for(const o of S.sats){const [sx,sy]=toS(o.x,o.y);if(vis(sx,sy,20))tacBracket(sx,sy,6+4*z,TC.bad,o,now)}
+      const n=S.sats.reduce((a,o)=>!a||Math.hypot(o.x-b.x,o.y-b.y)<Math.hypot(a.x-b.x,a.y-b.y)?o:a,null),[sx,sy]=toS(n.x,n.y);
+      if(vis(sx,sy,0))tacLabel(sx,sy,6+4*z,['STARLINK TRAIN','ACTIVE · KEEP CLEAR'],TC.bad);else tacEdge(sx,sy,'STARLINK',TC.bad);
+      threat=threat||tacThreat(S.sats.map(o=>({o,kind:'sat'})),b,b.stacked?40:22,{sat:.5});
+    }
+  }
+  /* ----- collision warning ----- */
+  if(threat){const [sx,sy]=toS(threat.o.x,threat.o.y),bl=threat.t<2;
+    ctx.strokeStyle=TC.bad;ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(sx,sy);ctx.stroke();ctx.setLineDash([]);
+    tacBracket(sx,sy,Math.max(10,(threat.o.r||2)*z+8),TC.bad,null,now,bl);
+    const what={ast:'ASTEROID',deb:'DEBRIS',sat:'SATELLITE'}[threat.kind];
+    tacChip(bx,Math.max(80,by-sr-30),`⚠ COLLISION ${threat.t.toFixed(1)}s · ${what} · ${Math.round(threat.rel)} m/s`,TC.bad,bl,now);
+    tacBeepT-=1/60;if(tacBeepT<=0){tacBeepT=threat.t<2?.35:.8;sfx('beep')}
+  }
+}
+function setTac(on){TAC=on;try{localStorage.setItem('mrt.tac',on?'1':'0')}catch(e){}const b=$('tac');if(b){b.textContent=on?'HUD':'HUD OFF';b.classList.toggle('off',!on)}}
+setTac(TAC);
 
 /* ---------- HUD ---------- */
 const fmt=n=>Math.round(n).toLocaleString('en-GB');
