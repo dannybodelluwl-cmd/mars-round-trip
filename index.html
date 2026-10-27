@@ -128,6 +128,10 @@ button:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 #capcom.alert{border-color:rgba(255,75,75,.5);border-left-color:var(--bad)}
 #capcom.alert b{color:var(--bad)}
 body.surface #capcom{bottom:calc(178px + env(safe-area-inset-bottom,0px))}
+/* hosts that pin a badge to the bottom of the page (Netlify): lift the controls clear of it */
+body.badge #ctl,body.badge #mine{bottom:56px}
+body.badge #capcom{bottom:calc(152px + env(safe-area-inset-bottom,0px))}
+body.badge.surface #capcom{bottom:calc(234px + env(safe-area-inset-bottom,0px))}
 .tr{display:flex;gap:8px;align-items:flex-start}
 #snd,#tac,#rst{pointer-events:auto;white-space:nowrap;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,18,.6);border-radius:6px;font-size:9.5px;letter-spacing:.1em;padding:4px 6px;color:#dfe6ec}
 #snd.off,#tac.off{color:var(--dim)}
@@ -255,6 +259,7 @@ canvas.cgart{display:block;width:calc(100% + 12px);margin:-8px -6px 6px;aspect-r
 (()=>{
 const cv=document.getElementById('cv');let ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
+if(/netlify\.app$/i.test(location.hostname))document.body.classList.add('badge');
 let W=0,H=0,DPR=1;
 function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=cv.clientWidth;H=cv.clientHeight;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR)}
 addEventListener('resize',resize);resize();try{new ResizeObserver(()=>{if(cv.clientWidth!==W||cv.clientHeight!==H)resize()}).observe(cv)}catch(e){}
