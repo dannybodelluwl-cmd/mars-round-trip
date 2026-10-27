@@ -61,6 +61,7 @@ button:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 #ctl button.on{background:#28323e;border-color:var(--cool)}
 #ctl #bThr{background:linear-gradient(#ff7a2e,#d9480f);border-color:#ff9a5c;color:#fff;font-size:18px}
 #ctl #bThr.on{filter:brightness(1.25)}
+@media (max-width:420px){#ctl button{font-size:15px;letter-spacing:.03em}#ctl #bThr{font-size:16px}}
 #ctl #bAct{border-color:var(--warn);color:var(--warn)}
 #ctl #bAct:disabled{opacity:.3}
 #ctl .arrow{font-size:24px}
@@ -757,7 +758,7 @@ function begin(name){
   $('rA').classList.remove('done');$('rH').classList.remove('done');
   if(name==='school'){
     planet=EARTH;body={x:0,y:MOUNT_H+25,vx:0,vy:0,ang:0,av:0,stacked:false,grounded:true,hull:0};booster=null;
-    S.school={step:0,maxAlt:0,msg:'Hold THRUST to lift off the launch mount'};$('bAct').hidden=true;mode='SL';updMode();
+    S.school={step:0,maxAlt:0,msg:'Hold THRUST to lift off the launch mount'};userZoom=2.8;$('zFit').textContent='×2.8';$('bAct').hidden=true;mode='SL';updMode();
     callout('Flight school, Starbase. Hop to five hundred metres and come back to the tower. Your call when ready.');
   }else if(name==='launch'){
     planet=EARTH;
@@ -1169,7 +1170,7 @@ function makeCargoArt(k,lv){
 }
 function paintCargoArt(cv,k,lv){const art=getTex(`cg_${k}_${lv}`,()=>makeCargoArt(k,lv)),d=Math.min(2,devicePixelRatio||1),w=cv.clientWidth||160,h=cv.clientHeight||90;cv.width=Math.round(w*d);cv.height=Math.round(h*d);cv.getContext('2d').drawImage(art,0,0,cv.width,cv.height)}
 function menu(){
-  S.phase='menu';S.paused=true;S.catching=false;S.catchAnim=null;$('zoom').hidden=true;document.body.classList.remove('surface');
+  S.phase='menu';S.paused=true;S.catching=false;S.catchAnim=null;userZoom=1;$('zFit').textContent='AUTO';$('zoom').hidden=true;document.body.classList.remove('surface');
   $('hud').hidden=true;$('ctl').hidden=true;$('mine').hidden=true;
   body={x:0,y:82,vx:0,vy:0,ang:0,av:0,stacked:true,grounded:true};planet=EARTH;booster=null;
   const draw=()=>{
