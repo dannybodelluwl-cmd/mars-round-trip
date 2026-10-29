@@ -129,13 +129,16 @@ button:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 #capcom.alert{border-color:rgba(255,75,75,.5);border-left-color:var(--bad)}
 #capcom.alert b{color:var(--bad)}
 body.surface #capcom{bottom:calc(178px + env(safe-area-inset-bottom,0px))}
+#crewB{display:none}body.surface #crewB{display:inline-block}@media (max-width:430px){#rst .lbl{display:none}}
+.crew{display:grid;gap:6px}.crew .p{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center;border:1px solid rgba(240,240,250,.12);padding:8px 10px;font-size:12px}.crew .p b{font-size:13px;letter-spacing:.06em}.crew .p small{color:rgba(240,240,250,.55);grid-column:1/4}.crew .bars{display:flex;gap:6px;align-items:center;font-size:10px;color:rgba(240,240,250,.5);letter-spacing:.1em}.crew .bars i{display:block;width:46px;height:4px;background:rgba(240,240,250,.12)}.crew .bars i u{display:block;height:100%;text-decoration:none}
+.foci{display:flex;gap:6px;flex-wrap:wrap}.foci .tg[aria-pressed="true"]{background:rgba(240,240,250,.14)}
 body.ovopen #ctl,body.ovopen #mine,body.ovopen #zoom,body.ovopen #hud *{pointer-events:none!important}
 /* hosts that pin a badge to the bottom of the page (Netlify): lift the controls clear of it */
 body.badge #ctl,body.badge #mine{bottom:56px}
 body.badge #capcom{bottom:calc(152px + env(safe-area-inset-bottom,0px))}
 body.badge.surface #capcom{bottom:calc(234px + env(safe-area-inset-bottom,0px))}
 .tr{display:flex;gap:8px;align-items:flex-start}
-#snd,#tac,#rst{pointer-events:auto;white-space:nowrap;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,18,.6);border-radius:6px;font-size:9.5px;letter-spacing:.1em;padding:4px 6px;color:#dfe6ec}
+#snd,#tac,#rst,#crewB{pointer-events:auto;white-space:nowrap;border:1px solid rgba(255,255,255,.18);background:rgba(8,12,18,.6);border-radius:6px;font-size:9.5px;letter-spacing:.1em;padding:4px 6px;color:#dfe6ec}
 #snd.off,#tac.off{color:var(--dim)}
 #toast.big{font-size:clamp(48px,16vw,96px);top:26%}
 .cargo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -217,7 +220,7 @@ canvas.cgart{display:block;width:calc(100% + 12px);margin:-8px -6px 6px;aspect-r
   <div id="hud" hidden>
     <div class="top">
       <div id="ph">Earth Ascent<small id="obj"></small></div>
-      <div class="tr"><div id="clock">T+00:00</div><button id="rst" aria-label="Restart or pause">↻ RESTART</button><button id="tac" aria-label="Toggle tactical HUD">HUD</button><button id="snd" aria-label="Toggle sound">SOUND</button></div>
+      <div class="tr"><div id="clock">T+00:00</div><button id="crewB" aria-label="Crew and priorities">CREW</button><button id="rst" aria-label="Restart or pause">↻<span class="lbl"> RESTART</span></button><button id="tac" aria-label="Toggle tactical HUD">HUD</button><button id="snd" aria-label="Toggle sound">SOUND</button></div>
     </div>
     <div class="side left" id="sideL">
       <div class="cell" id="rA"><span class="k" id="kA">ALT</span><b id="vA">0</b><small id="tA"></small></div>
@@ -385,7 +388,7 @@ function continueGame(){
 function mergeColony(a,b){
   const seen=new Set(),mods=[];for(const m of[...(a.mods||[]),...(b.mods||[])]){const k=m.mid+':'+m.t;if(!seen.has(k)&&MODS[m.t]){seen.add(k);mods.push(m)}}
   return{mods,samples:Math.max(a.samples||0,b.samples||0),landings:Math.max(a.landings||0,b.landings||0),builds:Math.max(a.builds||0,b.builds||0),bprog:Math.max(a.bprog||0,b.bprog||0),
-    settlers:((a.settlers||[]).length>=(b.settlers||[]).length?a.settlers:b.settlers),dome:[a.dome,b.dome].filter(Boolean).sort((x,y)=>(y.stage+y.p)-(x.stage+x.p))[0],scout:a.scout||b.scout,sol:Math.max(a.sol||0,b.sol||0)||undefined,lastMid:a.lastMid||b.lastMid};
+    settlers:((a.settlers||[]).length>=(b.settlers||[]).length?a.settlers:b.settlers),dome:[a.dome,b.dome].filter(Boolean).sort((x,y)=>(y.stage+y.p)-(x.stage+x.p))[0],scout:a.scout||b.scout,focus:a.focus||b.focus,research:Math.max(a.research||0,b.research||0),solarDust:a.solarDust??b.solarDust,food:a.food??b.food,sol:Math.max(a.sol||0,b.sol||0)||undefined,lastMid:a.lastMid||b.lastMid};
 }
 // connect to the account store once the viewer answers; reconcile with what this browser had
 (async()=>{
@@ -1287,6 +1290,24 @@ function pauseMenu(){
   $('pzR').onclick=()=>{hide();S.paused=wasPaused};
 }
 $('rst').addEventListener('click',pauseMenu);
+function crewSheet(){
+  if(S.phase!=='mining'||!$('ov').hidden)return;const wasPaused=S.paused;
+  const draw=()=>{const list=(colonists||[]).map(c=>{const w=c.who||{name:'Crew',role:'',tag:''};const tk=c.hidden?'in the ship':c.task?TASK_LABEL[c.task.k]:'idle';
+      const bar=(v,col)=>`<i><u style="width:${Math.round(v)}%;background:${col}"></u></i>`;
+      return `<div class="p"><b style="color:${c.suit}">▍</b><div><b>${w.name}</b> · ${w.role}</div><span style="color:rgba(240,240,250,.7)">${tk}</span>
+        <small><span class="bars">O₂ ${bar(c.o2??100,(c.o2??100)<30?'#ff4b4b':'#69d3ff')} FATIGUE ${bar(c.fat??0,'#ffc23d')}</span>${w.trait?`${w.trait}.`:''}</small></div>`}).join('');
+    show(`<div class="eyebrow">Jezero Base · Sol ${colony.sol||1}</div><h2>Crew</h2>
+      <p>The settlers choose their own work from the job board, by role. Set the colony's priority and they'll lean that way. Storms, low suit oxygen and tiredness come first.</p>
+      <div class="lab"><span>COLONY PRIORITY</span></div>
+      <div class="foci">${Object.entries(FOCI).map(([k,f])=>`<button class="tg" data-f="${k}" aria-pressed="${(colony.focus||'balanced')===k}">${f.label}</button>`).join('')}</div>
+      <div class="lab"><span>${(colonists||[]).length} SETTLERS</span><span>PANEL DUST ${Math.round(colony.solarDust||0)}% · RESEARCH ${colony.research||0}</span></div>
+      <div class="crew">${list||'<p>No settlers yet.</p>'}</div>
+      <div class="btns"><button class="btn" id="crX">Back to the surface</button></div>`);
+    document.querySelectorAll('.foci .tg').forEach(b=>b.onclick=()=>{colony.focus=b.dataset.f;colSave();for(const c of colonists||[])if(c.task&&!['shelter','rest','dome'].includes(c.task.k)&&!c.carry)c.task=null;sfx('ui');draw()});
+    $('crX').onclick=()=>{hide();S.paused=wasPaused}};
+  draw();
+}
+$('crewB').addEventListener('click',crewSheet);
 const KMAP={KeyM:'mine',Equal:'zin',NumpadAdd:'zin',Minus:'zout',NumpadSubtract:'zout',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'thrust',KeyW:'thrust',Space:'thrust'};
 addEventListener('keydown',e=>{
   if(!$('ov').hidden&&$('pzR')){if(e.code==='Escape'){e.preventDefault();$('pzR').click()}return}
@@ -2200,7 +2221,7 @@ function stepSurface(dt){
     if(BG.cap-load-amt<.01)toast('Rover full — take it back to the ship','var(--ok)');
   }
   // refinery
-  const r=m.ref,rate=1+.5*colN('solar');
+  const r=m.ref,rate=1+.5*colN('solar')*(1-(colony.solarDust||0)/160);
   r.busy=false;
   if(r.ice>0){const u=Math.min(r.ice,2.4*rate*dt);r.ice-=u;const add=Math.min(u*1.45,100-ship.fuel);ship.fuel+=add;ship.stats.mined+=add;r.busy=true}
   if(r.iron>0){const u=Math.min(r.iron,3.2*rate*dt);r.iron-=u;r.kitProg+=u/15;r.busy=true;
@@ -2637,6 +2658,76 @@ function spawnColonists(founding){
     else if(!domeReady()){c.x=c.tx=DOME_X+(i-1.5)*3}
     colonists.push(c)}
 }
+/* ---------- Phase 3: autonomous crew. Needs, roles, a job board and colony priorities ---------- */
+// what each role is good at (weights on the job board)
+const ROLE_W={ENG:{build:3,clean:2,repair:2.6,haul:1.2,survey:.4,farm:.4,research:.6},
+              GEO:{build:1,clean:.8,repair:.8,haul:1.6,survey:3.2,farm:.3,research:1.2},
+              BIO:{build:.8,clean:.8,repair:.6,haul:1,survey:.5,farm:3.2,research:1.4},
+              MED:{build:1.1,clean:1.4,repair:1.4,haul:1,survey:.6,farm:1,research:2}};
+const FOCI={balanced:{label:'Balanced'},build:{label:'Build',build:2.2,clean:1.2},fuel:{label:'Fuel',haul:2.6},explore:{label:'Explore',survey:2.6,research:1.4},maintain:{label:'Maintain',clean:2.2,repair:2.2,farm:1.4}};
+const TASK_LABEL={build:'building',clean:'cleaning panels',repair:'repairing SCOUT-1',haul:'hauling ice',survey:'surveying',farm:'tending crops',research:'research',rest:'resting',shelter:'sheltering',dome:'building the dome',idle:'idle'};
+const homeX=()=>{const sh=colBuilt().filter(isShelter).map(modX);return sh.length?sh:[body?body.x-6:BASE_X]};
+const nearest=(arr,x)=>arr.reduce((a,b)=>Math.abs(b-x)<Math.abs(a-x)?b:a,arr[0]);
+function jobBoard(){
+  const J=[],m=mining,b=BUILDS[colony.builds||0];
+  if(b&&domeReady())J.push({k:'build',x:b.x,need:1});
+  if(colN('solar'))J.push({k:'clean',x:modX('solar'),need:clamp((colony.solarDust||0)/40,0,1.5)});
+  if(colony.scout&&colony.scout.hp<70)J.push({k:'repair',x:colony.scout.x,need:(70-colony.scout.hp)/30});
+  if(colN('green'))J.push({k:'farm',x:modX('green'),need:.9});
+  if(m){const ice=m.deps.filter(d=>d.type==='ice'&&d.left>2).sort((a,c)=>Math.abs(a.x-m.ref.x)-Math.abs(c.x-m.ref.x))[0];if(ice&&Math.abs(ice.x-m.ref.x)<320&&ship.fuel<100)J.push({k:'haul',x:ice.x,dep:ice,need:ship.fuel<homeNeed()?1.4:.6})}
+  J.push({k:'survey',x:null,need:(m&&m.found>=3)?.2:.9});
+  if(domeReady())J.push({k:'research',x:nearest(homeX(),BASE_X),need:.7});
+  return J;
+}
+function pickTask(c){
+  const role=c.who?c.who.tag:'ENG',W=ROLE_W[role]||ROLE_W.ENG,F=FOCI[colony.focus||'balanced']||{};
+  const taken={};for(const o of colonists)if(o!==c&&o.task)taken[o.task.k]=(taken[o.task.k]||0)+1;
+  let best=null,bs=-1;
+  for(const j of jobBoard()){const dist=j.x==null?120:Math.abs(j.x-c.x);const sc=(W[j.k]||.5)*(F[j.k]||1)*j.need/(1+.9*(taken[j.k]||0))/(1+dist/180)*(0.8+Math.random()*.4);if(sc>bs){bs=sc;best=j}}
+  if(!best)return{k:'idle',x:c.x+rnd(-10,10),dur:rnd(3,6)};
+  const t={k:best.k,x:best.x,dur:{build:14,clean:9,repair:10,haul:5,survey:7,farm:10,research:14}[best.k]||8,dep:best.dep};
+  if(t.k==='survey'){const dir=Math.random()<.5?-1:1;t.x=clamp((body?body.x:BASE_X)+dir*rnd(90,220),MARS_X0+200,MARS_X0+MARS_STEP*MARS_N-200)}
+  if(t.k==='build'||t.k==='clean'||t.k==='farm')t.x+=rnd(-4,4);
+  return t;
+}
+function finishTask(c){
+  const t=c.task,m=mining,who=c.who?c.who.name.split(' ')[0]:'Crew';
+  if(t.k==='clean')colony.solarDust=Math.max(0,(colony.solarDust||0)-18);
+  else if(t.k==='repair'&&colony.scout){colony.scout.hp=Math.min(100,colony.scout.hp+22);if(colony.scout.hp>=70)toast(`${who} got SCOUT-1 running again`,'var(--ok)')}
+  else if(t.k==='farm')colony.food=Math.min(100,(colony.food||20)+2);
+  else if(t.k==='research'){colony.research=(colony.research||0)+1;if(colony.research%5===0){toast(`Research milestone · ${colony.research} studies completed`,'var(--cool)');sfx('chime')}}
+  else if(t.k==='haul'&&t.phase==='dig'){const amt=Math.min(1.6,t.dep.left);t.dep.left-=amt;c.carry=amt;c.task={k:'haul',phase:'carry',x:m.ref.x+rnd(-1.5,1.5),dur:1.5,dep:t.dep};return}
+  else if(t.k==='haul'&&t.phase==='carry'){if(c.carry){m.ref.ice+=c.carry;c.carry=0}}
+  else if(t.k==='survey'&&m&&(m.found||0)<3&&Math.random()<.45){
+    const type=Math.random()<.6?'ice':'iron',x=t.x+rnd(-20,20);
+    if(!m.deps.some(d=>Math.abs(d.x-x)<30)&&!modAt(x,false,8)&&Math.abs(x-body.x)>30){const amt=type==='ice'?Math.round(rnd(30,55)):Math.round(rnd(25,40));m.deps.push({type,x,w:type==='ice'?14:11,left:amt,max:amt,found:who});m.flats.push([x-12,x+12]);m.found=(m.found||0)+1;
+      const dist=Math.round(Math.abs(x-body.x)),dirS=x>body.x?'east':'west';toast(`${who} found ${type==='ice'?'water ice':'hematite'} · ${dist} m ${dirS}`,'var(--ok)');sfx('chime');callout(`${who} here. Got a ${type==='ice'?'shallow ice deposit':'hematite outcrop'} about ${dist} metres ${dirS} of the ship. Marking it for the rover.`)}}
+  else if(t.k==='build'){} // building progress accrues while on site
+  c.task=null;
+}
+function stepCrewAI(c,i,dt){
+  const m=mining,storm=m&&m.stormOn,inside=!!c.inside;
+  c.o2=c.o2??100;c.fat=c.fat??0;
+  // needs: suit oxygen outside, fatigue while working; both recover indoors
+  if(inside){c.o2=Math.min(100,c.o2+12*dt);c.fat=Math.max(0,c.fat-4*dt)}else{c.o2=Math.max(0,c.o2-(storm?.9:.22)*dt);if(c.task&&c.task.k!=='idle')c.fat=Math.min(100,c.fat+.11*dt)}
+  // emergencies first
+  if(storm){if(!c.task||c.task.k!=='shelter'){if(c.carry){m.ref.ice+=c.carry*.5;c.carry=0}c.task={k:'shelter',x:nearest(homeX(),c.x),dur:999}}}
+  else if(c.task&&c.task.k==='shelter'){c.task=null;c.inside=false}
+  if(!c.task&&!inside&&(c.o2<30||c.fat>80))c.task={k:'rest',x:nearest(homeX(),c.x),dur:rnd(10,16)};
+  if(!c.task)c.task=pickTask(c);
+  const t=c.task;
+  if(t.k==='repair'&&colony.scout){t.x=colony.scout.x+(c.x<colony.scout.x?-1.8:1.8);colony.scout.tx=colony.scout.x}
+  const d=t.x-c.x;
+  if(Math.abs(d)>.4&&!inside){c.dir=Math.sign(d);c.x+=c.dir*Math.min(Math.abs(d),c.v*(storm?2.6:1.9)*(c.carry?.8:1))*dt;c.walk+=dt*c.v*4;c.work=false;return}
+  // arrived
+  if(t.k==='shelter'||t.k==='rest'||t.k==='research'){c.inside=true}
+  c.work=!c.inside&&t.k!=='idle';
+  if(t.k==='haul'&&!t.phase){t.phase='dig';t.dur=5}
+  t.dur-=dt;
+  if(t.k==='build'&&domeReady()){colony.bprog=(colony.bprog||0)+dt/200}
+  if(t.dur<=0){if(c.inside&&t.k!=='shelter'){c.inside=false}finishTask(c)}
+}
+
 function stepColonists(dt){
   if(!colonists)return;
   const b=BUILDS[colony.builds||0],site=b?b.x:null,sites=colBuilt().filter(k=>k!=='pad').map(modX).concat(BASE_X-40,BASE_X+60,body?body.x+14:BASE_X);
@@ -2648,16 +2739,17 @@ function stepColonists(dt){
       if(D.stage===8&&D.p>.4&&Math.abs(c.x-jx)<1.5)c.inside=true;
       if(Math.abs(c.tx-c.x)>.3){c.dir=Math.sign(c.tx-c.x);c.x+=c.dir*Math.min(Math.abs(c.tx-c.x)/dt,c.v*1.6)*dt;c.walk+=dt*c.v*4}
       return}
-    c.job=false;if(domeReady())c.inside=false;
-    c.work=surf&&domeReady()&&site!==null&&i<4&&!(mining&&mining.stormOn);
+    c.job=false;
+    if(surf){stepCrewAI(c,i,dt);return}
+    c.inside=false;c.task=null;
+    c.work=false;
     if(mining&&mining.stormOn){const sh=colBuilt().filter(isShelter).map(modX);c.tx=sh.length?sh[i%sh.length]:body.x-6}
     else if(c.work)c.tx=site+(i-1.5)*2.2;
     if(Math.abs(c.tx-c.x)>.3){c.dir=Math.sign(c.tx-c.x);c.x+=c.dir*c.v*dt*(mining&&mining.stormOn?2:1);c.walk+=dt*c.v*4}
     else if(!c.work&&(c.idle-=dt)<=0){c.idle=rnd(2,7);c.tx=sites[Math.floor(Math.random()*sites.length)]+rnd(-9,9)}
   });
-  if(surf&&b&&domeReady()&&!(mining&&mining.stormOn)){
-    const workers=Math.min(4,colonists.length);
-    colony.bprog=(colony.bprog||0)+dt*workers/240;
+  if(surf){colony.solarDust=Math.min(100,(colony.solarDust||0)+dt*(mining&&mining.stormOn?.5:.04))}
+  if(surf&&b&&domeReady()){
     if(colony.bprog>=1){colony.bprog=0;colony.builds=(colony.builds||0)+1;colSave();toast(`Colonists finished the ${b.name}`,'var(--ok)');sfx('chime');callout(`Base update: the crew has finished the ${b.name}.`)}
   }
 }
@@ -2683,7 +2775,10 @@ function drawCrew(c,t){
   ctx.fillStyle='#f6f7f9';ctx.beginPath();ctx.arc(x,y+1.8,.23,0,6.283);ctx.fill();
   ctx.fillStyle='#14171b';ctx.beginPath();ctx.ellipse(x+d*.07,y+1.8,.16,.13,0,0,6.283);ctx.fill();
   ctx.fillStyle='rgba(170,215,255,.6)';ctx.fillRect(x+d*.09-.04,y+1.84,.08,.03);
-  if(c.who&&pxPerM()>9){ctx.fillStyle='rgba(6,10,15,.55)';const nm=c.who.name.split(' ')[0];ctx.fillRect(x-.9,y+2.25,1.8,.42);ctx.fillStyle=c.suit;ctx.fillRect(x-.9,y+2.25,.08,.42);wText(`${nm} · ${c.who.tag}`,x-.75,y+2.37,.24,'#f0f0fa','left',600)}
+  if(c.carry){ctx.fillStyle='#e6f3fb';ctx.fillRect(x-d*.45-.3,y+1.05,.6,.5);ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(x-d*.45-.3,y+1.05,.6,.08)}
+  if(c.who&&pxPerM()>9){const nm=c.who.name.split(' ')[0],tk=c.task?TASK_LABEL[c.task.k]||'':'',lab=`${nm} · ${c.who.tag}${tk?' · '+tk:''}`,w=lab.length*.13+.3;
+    ctx.fillStyle='rgba(6,10,15,.55)';ctx.fillRect(x-w/2,y+2.25,w,.42);ctx.fillStyle=c.suit;ctx.fillRect(x-w/2,y+2.25,.08,.42);wText(lab,x-w/2+.15,y+2.37,.24,'#f0f0fa','left',600);
+    if(c.o2<35){ctx.fillStyle='#ff4b4b';ctx.fillRect(x-w/2,y+2.18,w*c.o2/100,.05)}}
   if(c.work&&Math.random()<.25&&particles.length<480)particles.push({x:x+d*.5,y:y+1.3,vx:rnd(-2,2),vy:rnd(0,2),life:.3,max:.3,size:.08,col:'#ffe08a',add:true});
   ctx.lineCap='butt';
 }
