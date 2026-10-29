@@ -465,9 +465,27 @@ function stepAnomaly(dt){
 }
 
 /* ---------- audio: synthesised engines, comms tones and callouts ---------- */
-const AU={ctx:null,on:true,voice:true,last:{}};
-try{const p=JSON.parse(localStorage.getItem('mrt.audio')||'{}');if(p.on===false)AU.on=false;if(p.voice===false)AU.voice=false}catch(e){}
-function auSave(){try{localStorage.setItem('mrt.audio',JSON.stringify({on:AU.on,voice:AU.voice}))}catch(e){}}
+const AU={ctx:null,on:true,voice:true,vname:'',last:{}};
+try{const p=JSON.parse(localStorage.getItem('mrt.audio')||'{}');if(p.on===false)AU.on=false;if(p.voice===false)AU.voice=false;if(p.vname)AU.vname=p.vname}catch(e){}
+function auSave(){try{localStorage.setItem('mrt.audio',JSON.stringify({on:AU.on,voice:AU.voice,vname:AU.vname}))}catch(e){}}
+// pick the most natural free voice this device offers: Edge/Windows neural, Google, Apple premium/enhanced, then any English
+function voiceScore(v){
+  if(!/^en/i.test(v.lang))return -1;const n=v.name;let s=0;
+  if(/natural|neural/i.test(n))s+=60;            // Microsoft online neural (Edge) — the best free voices around
+  if(/premium/i.test(n))s+=55;if(/enhanced/i.test(n))s+=45; // Apple downloadable voices
+  if(/^google/i.test(n))s+=35;if(/online/i.test(n))s+=10;
+  if(/siri/i.test(n))s+=40;
+  if(/(daniel|arthur|oliver|jamie|ryan|guy|davis|andrew|brian|christopher|eric|roger|steffan|thomas|william)/i.test(n))s+=8; // calm male mission-control tones
+  if(/en[-_](GB|US|AU|IE)/i.test(v.lang))s+=4;
+  if(/(espeak|compact|novelty|bad news|bells|boing|bubbles|cellos|whisper|zarvox|trinoids|organ|albert|jester|wobble|superstar|bahh|good news|deranged|hysterical|pipe)/i.test(n))s-=80;
+  if(v.localService===false)s+=3;return s}
+let VOICES=[];
+function loadVoices(){try{VOICES=speechSynthesis.getVoices().filter(v=>voiceScore(v)>=0).sort((a,b)=>voiceScore(b)-voiceScore(a))}catch(e){VOICES=[]}}
+if('speechSynthesis' in window){loadVoices();try{speechSynthesis.addEventListener('voiceschanged',loadVoices)}catch(e){speechSynthesis.onvoiceschanged=loadVoices}}
+function curVoice(){if(!VOICES.length)loadVoices();return VOICES.find(v=>v.name===AU.vname)||VOICES[0]||null}
+const voiceLabel=()=>{const v=curVoice();return v?v.name.replace(/^Microsoft\s+|^Google\s+|\s*\(.*\)|\s*Online|\s*-\s*English.*$/gi,'').trim().slice(0,22):'default'};
+let sayTimers=[];
+function hushVoice(){sayTimers.forEach(clearTimeout);sayTimers=[];try{speechSynthesis.cancel()}catch(e){}}
 function auInit(){
   if(AU.ctx){if(AU.ctx.state==='suspended')AU.ctx.resume().catch(()=>{});return}
   try{
@@ -532,12 +550,13 @@ function sfx(k){
   }
 }
 function say(text,urgent){
-  if(!AU.voice||!AU.on||!('speechSynthesis' in window))return;
+  if(!AU.voice||!AU.on||!('speechSynthesis' in window)||document.hidden)return;
   try{
     const ss=window.speechSynthesis;
     if(ss.speaking||ss.pending){if(!urgent)return;ss.cancel()}
-    const u=new SpeechSynthesisUtterance(text);u.rate=1.07;u.pitch=.9;u.volume=.95;
-    const vs=ss.getVoices();const v=vs.find(v=>/en[-_]US/i.test(v.lang)&&/male|david|alex|guy|fred|aaron|daniel/i.test(v.name))||vs.find(v=>/^en/i.test(v.lang));if(v)u.voice=v;
+    const u=new SpeechSynthesisUtterance(text),v=curVoice();
+    const neural=v&&/natural|neural|premium|enhanced|siri/i.test(v.name);
+    u.rate=neural?1.04:1.07;u.pitch=neural?1:.92;u.volume=.95;if(v){u.voice=v;u.lang=v.lang}
     ss.speak(u);
   }catch(e){}
 }
@@ -547,8 +566,8 @@ function callout(text,alert){
   if(!AU.ctx||!AU.on)return;
   sfx('qin');if(alert)sfx('alarm');
   const d=alert?1000:280;
-  setTimeout(()=>say(text,alert),d);
-  setTimeout(()=>sfx('qout'),d+text.length*60+450);
+  sayTimers.push(setTimeout(()=>say(text,alert),d));
+  sayTimers.push(setTimeout(()=>sfx('qout'),d+text.length*60+450));
 }
 function auUpdate(){
   if(!AU.ctx)return;
@@ -1237,7 +1256,7 @@ function menu(){
       ${colony.scout?`<div>SCOUT-1 robotic rover · ${Math.round(colony.scout.hp)}% health · ${Math.round(colony.scout.odo||0)} m driven</div>`:''}
       <div>${colBuilt().length?`${colBuilt().length} building${colBuilt().length===1?'':'s'} · crew of ${colCrew()} · ${colBuilt().map(k=>MODS[k].short+(modMax(k)>1?' L'+colN(k):'')).join(', ')}${colPop()?` · ${colPop()} colonists`:''}${colony.builds?` · ${colony.builds} crew projects`:''}${colony.samples?` · ${colony.samples} sample tube${colony.samples>1?'s':''} returned`:''}`:'Every rocket that lands on Mars delivers its cargo here. Sending the same module again upgrades it, up to level 3.'}</div></div>
     <div class="keys">${SAVE.cloud?'Progress saves to your Claude account at every phase, so you can pick up on another device.':'Progress saves in this browser at every phase.'}</div>
-    <div class="toggles"><button class="tg" id="tgS" aria-pressed="${AU.on}">Sound: ${AU.on?'on':'off'}</button><button class="tg" id="tgV" aria-pressed="${AU.voice}">Voice callouts: ${AU.voice?'on':'off'}</button></div>
+    <div class="toggles"><button class="tg" id="tgS" aria-pressed="${AU.on}">Sound: ${AU.on?'on':'off'}</button><button class="tg" id="tgV" aria-pressed="${AU.voice}">Voice callouts: ${AU.voice?'on':'off'}</button>${AU.voice&&VOICES.length>1?`<button class="tg" id="tgVN" title="Tap to try the next voice on this device">Voice: ${voiceLabel()} ▸</button>`:''}</div>
     <div class="btns"><button class="btn" id="start">Light the candle</button><button class="btn ghost" id="fs2">Flight school</button></div>
     <div class="keys">Flight: ← → rotate · ↑ or Space thrust · E engine mode · S stage · P chute · M mine (in orbit) · +/− zoom<br>Rover: ← → drive · Space for the action button · L launch</div>`);
     document.querySelectorAll('.cg').forEach(b=>{b.onclick=()=>{cargoSel=b.dataset.c;sfx('ui');draw()};requestAnimationFrame(()=>paintCargoArt(b.querySelector('canvas'),b.dataset.c,+b.dataset.lv))});
@@ -1245,7 +1264,8 @@ function menu(){
     if($('cont'))$('cont').onclick=()=>{hide();continueGame()};
     if($('dsv'))$('dsv').onclick=e=>{const b=e.currentTarget;if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='Tap again to discard';return}clearGame();draw()};
     $('tgS').onclick=()=>{AU.on=!AU.on;auSave();updSnd();auInit();draw()};
-    $('tgV').onclick=()=>{AU.voice=!AU.voice;auSave();if(!AU.voice)try{speechSynthesis.cancel()}catch(e){}draw()};
+    $('tgV').onclick=()=>{AU.voice=!AU.voice;auSave();if(!AU.voice)hushVoice();draw()};
+    if($('tgVN'))$('tgVN').onclick=()=>{loadVoices();const top=VOICES.slice(0,8),i=top.indexOf(curVoice());const v=top[(i+1)%top.length];if(v){AU.vname=v.name;auSave();auInit();hushVoice();say('Mission control, radio check. How do you read?',true)}draw()};
     document.querySelectorAll('.rk').forEach(b=>{b.onclick=()=>{setRocket(b.dataset.r);draw()};requestAnimationFrame(()=>drawPreview(b.querySelector('canvas'),ROCKETS[b.dataset.r]))});
     document.querySelectorAll('.slot').forEach(b=>b.onclick=()=>{const i=+b.dataset.s;hangar[i]=hangar[i]==='SL'?'VAC':'SL';draw()});
     $('start').onclick=()=>{hide();ship=newShip();S.clock=0;buildEngChips();checkpoint('launch')};
@@ -1300,7 +1320,7 @@ updSnd();
 $('tac').addEventListener('click',()=>setTac(!TAC));
 function pauseMenu(auto){
   if(S.phase==='menu'||!S.cpPhase||!$('ov').hidden)return;
-  const wasPaused=S.paused;for(const k in keys)keys[k]=false;try{speechSynthesis.cancel()}catch(e){}
+  const wasPaused=S.paused;for(const k in keys)keys[k]=false;hushVoice();
   if(auto){show(`<div class="eyebrow">Paused · ${PHASES[S.cpPhase].title}</div><h2>Paused</h2><p>The game paused while you were away.</p><div class="btns"><button class="btn" id="pzR">Resume</button><button class="btn ghost" id="pzS">Restart stage</button><button class="btn ghost" id="pzN">New mission</button></div>`)}
   else show(`<div class="eyebrow">Paused · ${PHASES[S.cpPhase].title}</div><h2>Restart?</h2><p>Restarting the stage puts you back where ${PHASES[S.cpPhase].title.toLowerCase()} began, with the ship as it was then. A new mission goes back to rocket selection. Jezero Base keeps everything you've built.</p>
     <div class="btns"><button class="btn" id="pzS">Restart stage</button><button class="btn ghost" id="pzN">New mission</button><button class="btn ghost" id="pzR">Resume</button></div>`);
@@ -1309,6 +1329,8 @@ function pauseMenu(auto){
   $('pzR').onclick=()=>{hide();S.paused=wasPaused};
 }
 $('rst').addEventListener('click',()=>pauseMenu());
+document.addEventListener('visibilitychange',()=>{if(document.hidden){hushVoice();if(AU.ctx&&AU.ctx.state==='running')AU.ctx.suspend().catch(()=>{})}else if(AU.ctx&&AU.on)AU.ctx.resume().catch(()=>{})});
+window.addEventListener('pagehide',hushVoice);window.addEventListener('blur',()=>{if(document.hidden)hushVoice()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&!S.paused&&['launch','leo','toMars','toEarth','marsLand','mining','marsAscent','reentry','school','coast'].includes(S.phase))pauseMenu(true)});
 function crewSheet(){
   if(S.phase!=='mining'||!$('ov').hidden)return;const wasPaused=S.paused;
