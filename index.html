@@ -68,7 +68,7 @@ button:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 #mode small{display:block;font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.1em}
 
 /* overlays */
-.ov{position:absolute;inset:0;display:grid;place-items:center;background:rgba(4,6,9,.78);backdrop-filter:blur(3px);padding:20px max(16px,env(safe-area-inset-right,0px)) 20px max(16px,env(safe-area-inset-left,0px));overflow:auto}
+.ov{position:absolute;inset:0;z-index:40;display:grid;place-items:center;background:rgba(4,6,9,.78);backdrop-filter:blur(3px);padding:20px max(16px,env(safe-area-inset-right,0px)) 20px max(16px,env(safe-area-inset-left,0px));overflow:auto}
 .card{width:min(520px,100%);background:#0c1117;border:1px solid var(--line);border-radius:10px;padding:20px;display:grid;gap:14px}
 .eyebrow{font-size:11px;letter-spacing:.18em;color:var(--hot);text-transform:uppercase}
 .card h1,.card h2{font-family:var(--display);font-weight:800;letter-spacing:.03em;margin:0;line-height:.95;text-wrap:balance;text-transform:uppercase}
@@ -129,6 +129,7 @@ button:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 #capcom.alert{border-color:rgba(255,75,75,.5);border-left-color:var(--bad)}
 #capcom.alert b{color:var(--bad)}
 body.surface #capcom{bottom:calc(178px + env(safe-area-inset-bottom,0px))}
+body.ovopen #ctl,body.ovopen #mine,body.ovopen #zoom,body.ovopen #hud *{pointer-events:none!important}
 /* hosts that pin a badge to the bottom of the page (Netlify): lift the controls clear of it */
 body.badge #ctl,body.badge #mine{bottom:56px}
 body.badge #capcom{bottom:calc(152px + env(safe-area-inset-bottom,0px))}
@@ -205,6 +206,7 @@ canvas.cgart{display:block;width:calc(100% + 12px);margin:-8px -6px 6px;aspect-r
 .warnline{font-family:var(--din);color:#ffb84a}
 .brand{display:flex;justify-content:space-between;align-items:center;font-family:var(--din);font-weight:700;letter-spacing:.32em;font-size:11px;color:rgba(240,240,250,.75);border-bottom:1px solid rgba(240,240,250,.14);padding-bottom:12px}
 .brand i{font-style:normal;font-weight:500;color:rgba(240,240,250,.4);letter-spacing:.2em}
+.roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 14px;font-size:12px}.roster div{display:flex;gap:6px;align-items:baseline}.roster span{color:rgba(240,240,250,.5);font-size:11px}
 .school{display:grid;gap:10px;border:1px solid rgba(240,240,250,.3);padding:14px 16px;background:linear-gradient(90deg,rgba(240,240,250,.07),rgba(240,240,250,.02))}
 .school h3{margin:0;font-family:var(--din);font-weight:700;letter-spacing:.14em;font-size:15px;text-transform:uppercase}
 .school p{font-size:13.5px}
@@ -352,7 +354,7 @@ function colDeliver(t,mid){
 }
 // building whose footprint covers x (optionally only storm shelters)
 function modAt(x,shelterOnly,pad){
-  for(const k of colBuilt()){if(k==='pad'||shelterOnly&&!MODS[k].shelter)continue;if(Math.abs(x-modX(k))<modW(k)/2+(pad||0))return k}
+  for(const k of colBuilt()){if(k==='pad'||shelterOnly&&!isShelter(k))continue;if(Math.abs(x-modX(k))<modW(k)/2+(pad||0))return k}
   return null;
 }
 let cargoSel=Object.keys(MODS).find(k=>colN(k)<modMax(k))||'hab';
@@ -382,7 +384,8 @@ function continueGame(){
 }
 function mergeColony(a,b){
   const seen=new Set(),mods=[];for(const m of[...(a.mods||[]),...(b.mods||[])]){const k=m.mid+':'+m.t;if(!seen.has(k)&&MODS[m.t]){seen.add(k);mods.push(m)}}
-  return{mods,samples:Math.max(a.samples||0,b.samples||0),landings:Math.max(a.landings||0,b.landings||0),builds:Math.max(a.builds||0,b.builds||0),bprog:Math.max(a.bprog||0,b.bprog||0)};
+  return{mods,samples:Math.max(a.samples||0,b.samples||0),landings:Math.max(a.landings||0,b.landings||0),builds:Math.max(a.builds||0,b.builds||0),bprog:Math.max(a.bprog||0,b.bprog||0),
+    settlers:((a.settlers||[]).length>=(b.settlers||[]).length?a.settlers:b.settlers),dome:[a.dome,b.dome].filter(Boolean).sort((x,y)=>(y.stage+y.p)-(x.stage+x.p))[0],scout:a.scout||b.scout,sol:Math.max(a.sol||0,b.sol||0)||undefined,lastMid:a.lastMid||b.lastMid};
 }
 // connect to the account store once the viewer answers; reconcile with what this browser had
 (async()=>{
@@ -394,7 +397,7 @@ function mergeColony(a,b){
     SAVE.db=db;SAVE.uid=id;
     const [g,c]=await Promise.all([db.doc(`data/users/${id}/game`).get(),db.doc(`data/users/${id}/colony`).get()]);
     SAVE.cloud=true;
-    if(c.exists){try{const cc=JSON.parse(c.data().json||'{}');colony=mergeColony(colony,cc);try{localStorage.setItem('mrt.colony',JSON.stringify(colony))}catch(e){}}catch(e){}}
+    if(c.exists){try{const cc=JSON.parse(c.data().json||'{}');colony=mergeColony(colony,cc);migrateColony();try{localStorage.setItem('mrt.colony',JSON.stringify(colony))}catch(e){}}catch(e){}}
     cloudWrite('colony',{json:JSON.stringify(colony)});
     if(g.exists){try{const gg=JSON.parse(g.data().json||'null');if(gg&&(!SAVE.game||gg.at>SAVE.game.at)){SAVE.game=gg;try{localStorage.setItem('mrt.save',JSON.stringify(gg))}catch(e){}}}catch(e){}}
     else if(SAVE.game)cloudWrite('game',{json:JSON.stringify(SAVE.game)});
@@ -612,7 +615,7 @@ function runEngines(dt,firingAllowed){
     }
   }
   if(ship.fuel<=0){ship.fuel=0}
-  ship.fuel=f0-(f0-ship.fuel)*RK.fuel;if(ship.fuel<0)ship.fuel=0;
+  ship.fuel=f0-(f0-ship.fuel)*RK.fuel*(S.phase==='reentry'||S.phase==='school'?.55:1);if(ship.fuel<0)ship.fuel=0;
   return {acc:acc*RK.thrust*(1+0.35*(1-ship.fuel/100)),anyFire};
 }
 const ROCKETS={
@@ -714,19 +717,20 @@ function briefing(name){
     if(transferBase()>ship.fuel)warn=`You can't afford this burn even if it's perfect. Retry the previous phase or restart.`;
   }else if(name==='marsLand'){
     body=`<p>You're coming in fast over Jezero-style terrain. Kill your sideways speed and set down on the <b>ice field</b> (white, ~1.1 km ahead). Thin air, low gravity, very little drag.</p>
-    <ul><li>Touch down <b>upright</b>, under <b>5 m/s</b> down and <b>4 m/s</b> sideways.</li>
+    <ul>${firstMission()?`<li><b>First crewed landing.</b> Six aboard. SCOUT-1, the robotic rover that's been here for years, has set a <b>green beacon</b> on the ice field. Land next to it.</li>`:''}
+    <li>Touch down <b>upright</b>, under <b>5 m/s</b> down and <b>4 m/s</b> sideways.</li>
     <li>Only flat ground is safe. Boulders tip you over.</li>
     ${colBuilt().length?`<li><b>Jezero Base</b> sits around the ice field. Don't land on the modules.${colN('pad')?' The landing pad in the middle has looser limits.':''}</li>`:''}
     <li>Landing off the ice still works, but the rover has further to drive for water.</li>
     <li><b>Emergency chute</b> (tap <b>Chute</b>, or P): one use. Opens below 85 m/s and lowers you anywhere at about 6 m/s, but the thump wrecks engines: 1 on a landing zone, 2 on boulders.</li></ul>`;
   }else if(name==='mining'){
-    body=`<p>Open the cargo ramp and drive the <b>rover</b> out. Dig ice and hematite and bring it back up the ramp: stowing the rover feeds the <b>refinery</b>, which turns ice plus CO₂ into methane and oxygen, and hematite into repair kits.</p>
+    body=`${colony.dome&&!domeReady()?`<p><b>The settlers are building the Geo-dome.</b> Watch the checklist top left. They work by hand, step by step, and stop for storms. It doesn't need you, but you need fuel to get home.</p>`:''}<p>Open the cargo ramp and drive the <b>rover</b> out. Dig ice and hematite and bring it back up the ramp: stowing the rover feeds the <b>refinery</b>, which turns ice plus CO₂ into methane and oxygen, and hematite into repair kits.</p>
     <ul><li>Dust storms come and go. When one hits, the rover must be in the ship or a base shelter (habitat, greenhouse or garage), or the crew is in trouble.</li>
     <li>The rover runs on batteries. It recharges in the ship, in shelters and near the solar farm.</li>
     <li>There's more ice further out, and Perseverance's sample tubes are somewhere on the delta. Bring them home.</li>
     <li>Fuel needed to get home: <b>${homeNeed()}%</b>. You have <b>${Math.round(ship.fuel)}%</b>. You can't launch into a storm.</li></ul>`;
   }else if(name==='marsAscent'){
-    body=`<p>Climb back to Mars orbit: <b>1,000 m up</b> and <b>110 m/s sideways</b>. Gravity is a third of Earth's, so go easy on the throttle.</p>`;
+    body=`${(colony.landings||0)===1?`<p><b>Two of you go home.</b> You and ${COPILOT} lift off; ${colPop()} settlers stay at Jezero${domeReady()?' in the Geo-dome':', still finishing the Geo-dome'}. The ship carries life support for the two of you for the seven-month coast home.</p>`:''}<p>Climb back to Mars orbit: <b>1,000 m up</b> and <b>110 m/s sideways</b>. Gravity is a third of Earth's, so go easy on the throttle.</p>`;
   }else if(name==='reentry'){
     body=`<p>You hit the atmosphere at 150 m/s. Keep the <b>dark heat shield</b> facing the way you're travelling, side-on to the arrow showing your direction of travel. Green arrow means the shield is doing its job. Point the nose or the steel side into the airflow and the hull cooks.</p>
     <ul><li>Steer distance with your angle: fully side-on brakes hardest, tilting toward the arrow glides further but runs hotter.</li>
@@ -741,6 +745,10 @@ function briefing(name){
 }
 
 function checkpoint(name){S.cp=clone(ship);S.cpPhase=name;saveGame();briefing(name)}
+function resetRun(){
+  releaseInputs();S.failing=false;S.catchAnim=null;S.catching=false;S.school=S.cpPhase==='school'?null:S.school;
+  mining=null;leo=null;tr=null;debris=null;booms=[];particles=[];rampLane=false;S.shake=0;S.flash=0;S.blackout=0;S.sats=[];
+}
 function retry(){ship=clone(S.cp);setRocket(ship.rk||RK.id);buildEngChips();briefing(S.cpPhase)}
 
 function begin(name){
@@ -815,10 +823,12 @@ function fail(reason,quick,delay){
   if(S.failing)return;
   S.failing=true;S.phase='dead';
   setTimeout(()=>{
+    const school=S.cpPhase==='school';
     show(`<div class="eyebrow">Mission failure</div><h2>${reason.t}</h2><p>${reason.d}</p>
-    <div class="btns"><button class="btn" id="rt">Retry ${PHASES[S.cpPhase].title}</button><button class="btn ghost" id="rs">Restart mission</button></div>`);
-    $('rt').onclick=()=>{hide();retry()};
-    $('rs').onclick=()=>{hide();menu()};
+    <div class="btns"><button class="btn" id="rt">Retry ${PHASES[S.cpPhase].title}</button>${school?'':'<button class="btn ghost" id="rs">Restart mission</button>'}<button class="btn ghost" id="rm">Main menu</button></div>`);
+    $('rt').onclick=()=>{hide();resetRun();retry()};
+    if($('rs'))$('rs').onclick=()=>{hide();resetRun();ship=newShip();S.clock=0;buildEngChips();checkpoint('launch')};
+    $('rm').onclick=()=>{hide();resetRun();menu()};
   },delay||(quick?400:1500));
 }
 function explode(reason){
@@ -908,7 +918,7 @@ function flight(dt){
   b.vx+=ax*dt;b.vy+=ay*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;
   if(!S.f.lift){
     if(S.phase==='launch'&&b.y>210){S.f.lift=1;callout(`Liftoff! ${RK.short} has cleared the tower.`)}
-    if(S.phase==='marsAscent'&&b.y-P.ground(b.x)>80){S.f.lift=1;callout('Liftoff from Mars. Heading for orbit.')}
+    if(S.phase==='marsAscent'&&b.y-P.ground(b.x)>80){S.f.lift=1;callout((colony.landings||0)===1?`Liftoff from Mars. ${colPop()} settlers watching from the surface. Look after each other down there.`:'Liftoff from Mars. Heading for orbit.')}
   }
   if(S.phase==='reentry'&&!S.f.flip&&b.y-P.ground(b.x)<480){S.f.flip=1;callout('Flip manoeuvre. Landing burn startup.')}
 
@@ -956,10 +966,10 @@ function flight(dt){
         toast(`Chute landing — ${n} engine${n>1?'s':''} wrecked`,'var(--warn)');
       }else toast(z.ice?'The Eagle has… you know':'Landed — off the ice field',z.ice?'var(--ok)':'var(--warn)');
       sfx('thud');callout('Touchdown confirmed. Welcome to Mars.');
-      if(colony.lastMid!==ship.mid){colony.lastMid=ship.mid;colony.landings=(colony.landings||0)+1;
+      if(colony.lastMid!==ship.mid){colony.lastMid=ship.mid;colony.landings=(colony.landings||0)+1;S.arrive=colonyArrive();
         if(colony.landings>1&&(colony.builds||0)<BUILDS.length){colony.builds=(colony.builds||0)+1;colony.bprog=0;S.away=BUILDS[colony.builds-1].name}colSave()}
       const mod=colDeliver(ship.cargo,ship.mid);
-      if(mod){S.build={type:mod.t,t:0};const lv=colN(mod.t);setTimeout(()=>callout(lv>1?`Cargo is coming off. Upgrading the ${MODS[mod.t].name.toLowerCase()} to level ${lv}.`:`Cargo is coming off. ${MODS[mod.t].name} going up at Jezero Base.`),3200)}
+      if(mod&&!(S.arrive&&S.arrive.founding)){S.build={type:mod.t,t:0};const lv=colN(mod.t);setTimeout(()=>callout(lv>1?`Cargo is coming off. Upgrading the ${MODS[mod.t].name.toLowerCase()} to level ${lv}.`:`Cargo is coming off. ${MODS[mod.t].name} going up at Jezero Base.`),3200)}
       S.paused=true;setTimeout(()=>{S.paused=false;checkpoint('mining')},1400);
       S.phase='landed';return;
     }
@@ -1176,6 +1186,7 @@ function menu(){
   const draw=()=>{
     const n=RK.slots;
     if(!MODS[cargoSel]||colN(cargoSel)>=modMax(cargoSel))cargoSel=Object.keys(MODS).find(k=>colN(k)<modMax(k))||'hab';
+    const fm=firstMission();if(fm)cargoSel='hab';
     let schooled=false;try{schooled=localStorage.getItem('mrt.school')==='done'}catch(e){}
     show(`<div class="brand"><span>MARS ROUND TRIP</span><i>STARBASE · JEZERO</i></div>
     <div class="eyebrow">Occupy Mars</div><h1>Mars Round Trip</h1>
@@ -1198,16 +1209,20 @@ function menu(){
     </ul>
     ${!hangar.includes('VAC')?'<div class="warnline">No VAC engines: interplanetary burns will cost almost double.</div>':''}
     ${hangar.filter(t=>t==='SL').length<2?'<div class="warnline">Fewer than 2 SL engines: you cannot land on Earth.</div>':''}
-    <div class="lab"><span>3 · CARGO FOR JEZERO BASE</span><span>${colBuilt().length} BUILT</span></div>
-    <div class="cargo">${Object.entries(MODS).map(([k,m])=>{const c=colN(k),dis=c>=modMax(k);return `<button class="cg${k===cargoSel?' on':''}" data-c="${k}" data-lv="${Math.min(modMax(k),c+1)}" ${dis?'disabled':''} aria-pressed="${k===cargoSel}"><canvas class="cgart" aria-hidden="true"></canvas><b>${m.short}</b><small>${m.desc}</small>${c?`<span class="n">${dis?'Complete':'Level '+c+' → '+(c+1)}</span>`:'<span class="n">New</span>'}</button>`}).join('')}</div>
-    <div class="base"><div class="row2"><h3>Jezero Base</h3>${colony.mods.length?'<button class="mini" id="rsb">Reset base</button>':''}</div>
+    <div class="lab"><span>3 · ${fm?'FIRST MISSION CARGO':'CARGO FOR JEZERO BASE'}</span><span>${fm?'6 CREW · 4 STAY':colBuilt().length+' BUILT'}</span></div>
+    ${fm?`<p style="font-size:13.5px">The first crewed flight carries six: you, co-pilot ${COPILOT}, and four settlers who stay behind. The only thing waiting on Mars is <b>SCOUT-1</b>, a robotic rover that landed years ago to scout the site. Your hold carries the <b>Geo-dome habitat kit</b>. The crew build it by hand on arrival. Everything else comes on later missions.</p>`:''}
+    <div class="cargo">${Object.entries(MODS).map(([k,m])=>{const c=colN(k),dis=c>=modMax(k)||fm&&k!=='hab';return `<button class="cg${k===cargoSel?' on':''}" data-c="${k}" data-lv="${Math.min(modMax(k),c+1)}" ${dis?'disabled':''} aria-pressed="${k===cargoSel}"><canvas class="cgart" aria-hidden="true"></canvas><b>${m.short}</b><small>${m.desc}</small>${c?`<span class="n">${dis?'Complete':'Level '+c+' → '+(c+1)}</span>`:`<span class="n">${fm&&k!=='hab'?'After the first habitat':fm?'Geo-dome kit · required':'New'}</span>`}</button>`}).join('')}</div>
+    <div class="base"><div class="row2"><h3>Jezero Base${colony.sol?` · Sol ${colony.sol}`:''}</h3>${colony.mods.length?'<button class="mini" id="rsb">Reset base</button>':''}</div>
+      ${colony.settlers&&colony.settlers.length?`<div class="roster">${colony.settlers.slice(0,8).map(p=>`<div><b style="color:${p.suit}">▍</b><b>${p.name}</b><span>${p.role}</span></div>`).join('')}${colony.settlers.length>8?`<div><span>+ ${colony.settlers.length-8} more</span></div>`:''}</div>`:''}
+      ${colony.dome&&!domeReady()?`<div>Geo-dome under construction · step ${colony.dome.stage+1} of ${DOME_STEPS.length}: ${DOME_STEPS[colony.dome.stage][0].toLowerCase()}</div>`:''}
+      ${colony.scout?`<div>SCOUT-1 robotic rover · ${Math.round(colony.scout.hp)}% health · ${Math.round(colony.scout.odo||0)} m driven</div>`:''}
       <div>${colBuilt().length?`${colBuilt().length} building${colBuilt().length===1?'':'s'} · crew of ${colCrew()} · ${colBuilt().map(k=>MODS[k].short+(modMax(k)>1?' L'+colN(k):'')).join(', ')}${colPop()?` · ${colPop()} colonists`:''}${colony.builds?` · ${colony.builds} crew projects`:''}${colony.samples?` · ${colony.samples} sample tube${colony.samples>1?'s':''} returned`:''}`:'Every rocket that lands on Mars delivers its cargo here. Sending the same module again upgrades it, up to level 3.'}</div></div>
     <div class="keys">${SAVE.cloud?'Progress saves to your Claude account at every phase, so you can pick up on another device.':'Progress saves in this browser at every phase.'}</div>
     <div class="toggles"><button class="tg" id="tgS" aria-pressed="${AU.on}">Sound: ${AU.on?'on':'off'}</button><button class="tg" id="tgV" aria-pressed="${AU.voice}">Voice callouts: ${AU.voice?'on':'off'}</button></div>
     <div class="btns"><button class="btn" id="start">Light the candle</button><button class="btn ghost" id="fs2">Flight school</button></div>
     <div class="keys">Flight: ← → rotate · ↑ or Space thrust · E engine mode · S stage · P chute · M mine (in orbit) · +/− zoom<br>Rover: ← → drive · Space for the action button · L launch</div>`);
     document.querySelectorAll('.cg').forEach(b=>{b.onclick=()=>{cargoSel=b.dataset.c;sfx('ui');draw()};requestAnimationFrame(()=>paintCargoArt(b.querySelector('canvas'),b.dataset.c,+b.dataset.lv))});
-    if($('rsb'))$('rsb').onclick=e=>{const b=e.currentTarget;if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='Tap again to reset';return}colony={mods:[],samples:0,landings:0,builds:0,bprog:0};colSave();cargoSel='hab';draw()};
+    if($('rsb'))$('rsb').onclick=e=>{const b=e.currentTarget;if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='Tap again to reset';return}colony={mods:[],samples:0,landings:0,builds:0,bprog:0};migrateColony();colSave();cargoSel='hab';draw()};
     if($('cont'))$('cont').onclick=()=>{hide();continueGame()};
     if($('dsv'))$('dsv').onclick=e=>{const b=e.currentTarget;if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='Tap again to discard';return}clearGame();draw()};
     $('tgS').onclick=()=>{AU.on=!AU.on;auSave();updSnd();auInit();draw()};
@@ -1221,8 +1236,15 @@ function menu(){
 }
 
 function ago(t){const s=(Date.now()-t)/1000;return s<90?'just now':s<5400?Math.round(s/60)+' min ago':s<129600?Math.round(s/3600)+' h ago':Math.round(s/86400)+' days ago'}
-function show(html){$('card').innerHTML=html;$('ov').hidden=false;S.paused=true}
-function hide(){$('ov').hidden=true}
+function releaseInputs(){for(const k in keys)keys[k]=false;document.querySelectorAll('#ctl .on,#mine .on,#zoom .on').forEach(b=>b.classList.remove('on'));if(mining)mining.digging=false}
+function show(html){releaseInputs();$('card').innerHTML=html;$('ov').hidden=false;document.body.classList.add('ovopen');S.paused=true}
+function hide(){$('ov').hidden=true;document.body.classList.remove('ovopen')}
+// Card buttons fire on a clean tap even if the browser drops the click (seen on iOS after a held drive button)
+(()=>{const card=$('card');let down=null,fired=0;
+  card.addEventListener('pointerdown',e=>{const b=e.target.closest('button');down=b?{b,x:e.clientX,y:e.clientY}:null},true);
+  card.addEventListener('pointerup',e=>{const b=e.target.closest('button');if(!down||b!==down.b||b.disabled||Math.hypot(e.clientX-down.x,e.clientY-down.y)>12){down=null;return}down=null;fired=Date.now();try{b.onclick?b.onclick({currentTarget:b,target:b,preventDefault(){}}):b.click()}catch(err){console.error('[Mars Round Trip] button',err)}},true);
+  card.addEventListener('click',e=>{if(Date.now()-fired<700){e.stopImmediatePropagation();e.preventDefault()}},true); // the browser's own click after a handled tap
+})();
 
 /* ---------- input ---------- */
 document.querySelectorAll('[data-k]').forEach(btn=>{
@@ -1260,8 +1282,8 @@ function pauseMenu(){
   const wasPaused=S.paused;for(const k in keys)keys[k]=false;
   show(`<div class="eyebrow">Paused · ${PHASES[S.cpPhase].title}</div><h2>Restart?</h2><p>Restarting the stage puts you back where ${PHASES[S.cpPhase].title.toLowerCase()} began, with the ship as it was then. A new mission goes back to rocket selection. Jezero Base keeps everything you've built.</p>
     <div class="btns"><button class="btn" id="pzS">Restart stage</button><button class="btn ghost" id="pzN">New mission</button><button class="btn ghost" id="pzR">Resume</button></div>`);
-  $('pzS').onclick=()=>{hide();S.failing=false;retry()};
-  $('pzN').onclick=()=>{hide();S.failing=false;menu()};
+  $('pzS').onclick=()=>{hide();resetRun();retry()};
+  $('pzN').onclick=()=>{hide();resetRun();menu()};
   $('pzR').onclick=()=>{hide();S.paused=wasPaused};
 }
 $('rst').addEventListener('click',pauseMenu);
@@ -2018,7 +2040,7 @@ function startSurface(){
   const deps=[];
   const ok=x=>Math.abs(x-sx)>34&&!modAt(x,false,6)&&!deps.some(d=>Math.abs(d.x-x)<30)&&!(x>PAD_X0-8&&x<PAD_X1+8&&colN('pad'));
   const place=(type,x,amt,w)=>{let tries=0;while(!ok(x)&&tries++<20)x+=(x>sx?1:-1)*24;deps.push({type,x,w,left:amt,max:amt})};
-  place('ice',onIce?sx+(sx<BASE_X+20?62:-62):sx-(sx<BASE_X?-1:1)*rnd(230,300),70,16);
+  place('ice',onIce?sx+(sx<BASE_X+20?62:-62):sx-(sx<BASE_X?-1:1)*rnd(80,120),70,16);
   for(let i=0;i<4;i++)place('ice',sx+(i%2?1:-1)*rnd(420+i*200,700+i*260),Math.round(rnd(60,110)),16);
   for(let i=0;i<3;i++)place('iron',sx+(i%2?-1:1)*rnd(250+i*200,520+i*260),Math.round(rnd(40,70)),12);
   // Perseverance left sample tubes on the delta for a future crew to collect
@@ -2030,14 +2052,20 @@ function startSurface(){
   // places that stay level: the ship and refinery, every deposit, Perseverance, base buildings
   const flats=[[sx-24,sx+22],[sx-28,sx-6],[perX+60,perX+80]].concat(deps.map(d=>[d.x-d.w/2-4,d.x+d.w/2+4]),colBuilt().map(k=>[modX(k)-modW(k)/2-5,modX(k)+modW(k)/2+5]));
   mining={
-    storm:110+20*colN('comms'),stormOn:false,stormLeft:0,stormN:0,deps,pebbles,near:[],flats,rs:[rnd(0,6),rnd(0,6),rnd(0,6),rnd(0,6),rnd(0,6)],perX:perX+70,
+    storm:150+20*colN('comms'),stormOn:false,stormLeft:0,stormN:0,deps,pebbles,near:[],flats,rs:[rnd(0,6),rnd(0,6),rnd(0,6),rnd(0,6),rnd(0,6)],perX:perX+70,
     ref:{x:sx-17,ice:0,iron:0,kitProg:0,busy:false,spin:0,dash:0},
     bg:null,rover:'stowed',ramp:0,rampDir:0,shelter:null,bat:100,hp:100,
     digging:false,digNow:false,slow:0,act:{k:'deploy',label:'Deploy rover'},warned:false
   };
-  spawnColonists();
+  mining.shipX=sx;mining.flats.push([DOME_X-17,DOME_X+15]);
+  const founding=colony.dome&&colony.dome.stage===0&&colony.dome.p===0;
+  if(founding&&Math.abs(sx-DOME_X)<200)mining.elev=0;
+  spawnColonists(founding);
+  const arr=S.arrive;S.arrive=null;
   if(S.away){const a=S.away;S.away=null;setTimeout(()=>{toast(`While you were away the crew built the ${a}`,'var(--ok)')},2600)}
-  if(colPop())setTimeout(()=>callout(`Jezero Base, population ${colPop()}. Welcome back.`),5200);
+  if(arr&&arr.msgs.length)arr.msgs.forEach((m,i)=>setTimeout(()=>toast(m,'var(--ok)'),2600+i*2600));
+  if(founding)setTimeout(()=>callout(`${FOUNDERS[0].name.split(' ')[0]} here. Crew elevator coming down. We'll get the dome kit off and start on the site SCOUT-1 marked for us.`),2200);
+  else if(colPop())setTimeout(()=>callout(`Jezero Base, Sol ${colony.sol||1}. Population ${colPop()}. Welcome back.`),5200);
   // base bonuses
   const hab=colN('hab'),dep=colN('depot');
   if(hab&&ship.kits<3){ship.kits=Math.min(3,ship.kits+hab);setTimeout(()=>toast(`Habitat workshop: +${hab} repair kit${hab>1?'s':''}`,'var(--ok)'),400)}
@@ -2174,7 +2202,7 @@ function stepSurface(dt){
   // refinery
   const r=m.ref,rate=1+.5*colN('solar');
   r.busy=false;
-  if(r.ice>0){const u=Math.min(r.ice,2.4*rate*dt);r.ice-=u;const add=Math.min(u*1.25,100-ship.fuel);ship.fuel+=add;ship.stats.mined+=add;r.busy=true}
+  if(r.ice>0){const u=Math.min(r.ice,2.4*rate*dt);r.ice-=u;const add=Math.min(u*1.45,100-ship.fuel);ship.fuel+=add;ship.stats.mined+=add;r.busy=true}
   if(r.iron>0){const u=Math.min(r.iron,3.2*rate*dt);r.iron-=u;r.kitProg+=u/15;r.busy=true;
     if(r.kitProg>=1){r.kitProg-=1;if(ship.kits<3){ship.kits++;toast('Refinery printed a repair kit','var(--ok)');sfx('chime')}else toast('Kit rack full (3)','var(--warn)')}}
   if(colN('rig')){const add=Math.min(.16*colN('rig')*dt,100-ship.fuel);ship.fuel+=add;ship.stats.mined+=add}
@@ -2185,11 +2213,11 @@ function stepSurface(dt){
   if(!m.stormOn){
     m.storm-=dt;
     if(m.storm<30&&!m.warned){m.warned=true;callout('Dust storm thirty seconds out. Get the rover into the ship or a base shelter.',true)}
-    if(m.storm<=0){m.stormOn=true;m.stormLeft=rnd(26,36);m.stormN++;toast('Dust storm!','var(--bad)');callout('Storm is on us. All crews in shelter.')}
+    if(m.storm<=0){m.stormOn=true;m.stormLeft=rnd(22,30);m.stormN++;toast('Dust storm!','var(--bad)');callout('Storm is on us. All crews in shelter.')}
   }else{
     m.stormLeft-=dt;
     if(m.rover==='out'){m.hp=Math.max(0,m.hp-3.4*dt);if(m.hp<=0)fail({t:'Rover lost in the storm',d:'The crew ran out of air and power in the dust. Get the rover into the ship or a base shelter before the storm hits.'})}
-    if(m.stormLeft<=0){m.stormOn=false;m.warned=false;m.storm=rnd(100,140)+20*colN('comms');callout('The storm has passed. Visibility improving. Good hunting.')}
+    if(m.stormLeft<=0){m.stormOn=false;m.warned=false;m.storm=rnd(130,170)+20*colN('comms');callout('The storm has passed. Visibility improving. Good hunting.')}
   }
 }
 const roverHome=()=>mining&&(mining.rover==='stowed'||mining.rover==='shelter')&&!mining.rampDir;
@@ -2446,7 +2474,8 @@ function drawBase(xL,xR,t){
   for(const k of colBuilt()){const x=modX(k),w=modW(k);if(x+w/2+60<xL||x-w/2-60>xR||k==='pad')continue;const y=marsAt(x);
     const ao=ctx.createRadialGradient(x,y,1,x,y,w*.7);ao.addColorStop(0,'rgba(40,18,10,.35)');ao.addColorStop(1,'rgba(40,18,10,0)');ctx.fillStyle=ao;ctx.beginPath();ctx.ellipse(x,y,w*.7,1.6,0,0,Math.PI*2);ctx.fill()}
   drawColony(xL,xR,t);
-  for(const k of colBuilt()){const x=modX(k),hw=modW(k)/2+60;if(x+hw<xL||x-hw>xR)continue;drawModule(k,t);
+  drawScout(t);if(S.phase==='mining')drawElevator(t);
+  for(const k of colBuilt()){const x=modX(k),hw=modW(k)/2+60;if(x+hw<xL||x-hw>xR)continue;if(k==='hab'&&!domeReady()){drawDomeSite(t);continue}drawModule(k,t);
     if(k!=='pad'&&pxPerM()>2.2){const y=marsAt(x),w=modW(k),px0=x+w/2-3.2;ctx.fillStyle='#e9e6de';ctx.fillRect(px0,y+.7,2.6,.9);ctx.fillStyle='#ff6a1f';ctx.fillRect(px0,y+.7,.22,.9);wText(`${MODTAG[k]}-${colN(k)}`,px0+.4,y+.92,.55,'#1d2024','left',700);
       ctx.save();ctx.globalCompositeOperation='lighter';const lg=ctx.createRadialGradient(px0+1.3,y,.1,px0+1.3,y,3);lg.addColorStop(0,'rgba(255,220,160,.22)');lg.addColorStop(1,'rgba(255,220,160,0)');ctx.fillStyle=lg;ctx.fillRect(px0-2,y-.2,6.6,2.4);ctx.restore()}}
 }
@@ -2464,33 +2493,177 @@ const BUILDS=[
   {id:'memorial',name:'First Landing memorial',x:943},
   {id:'berms',name:'pad blast walls',x:1090}
 ];
-const colPop=()=>Math.min(30,(colony.landings||0)*3+Math.floor(colCrew()/3));
+/* ---------- Phase 2: the first crewed mission, the founders, SCOUT-1 and the Geo-dome ---------- */
+const FOUNDERS=[
+  {name:'Amara Okafor',role:'Commander · Engineer',tag:'ENG',suit:'#ff6a1f',trait:'Calm under pressure, dry humour',bio:'Former ISS flight engineer. Wrote the dome assembly procedure herself.'},
+  {name:'Lucas Ferreira',role:'Geologist',tag:'GEO',suit:'#ffc23d',trait:'Restless, pockets full of rocks',bio:'Six field seasons in the Antarctic Dry Valleys. Here to read Jezero\'s old lake bed.'},
+  {name:'Mei Tanaka',role:'Botanist · Life support',tag:'BIO',suit:'#62de88',trait:'Meticulous, quietly stubborn',bio:'Ran a 400-day closed-loop greenhouse trial. Brought her own seed library.'},
+  {name:'Sam Rourke',role:'Systems tech · Medic',tag:'MED',suit:'#69d3ff',trait:'Upbeat, fixes anything with tape',bio:'Offshore rig technician turned flight medic. Unofficial morale officer.'}];
+const ARRIVALS=[['Priya Nair','Structural engineer','ENG','#ff6a1f'],['Tomasz Wolski','Driller','GEO','#ffc23d'],['Grace Mensah','Physician','MED','#69d3ff'],['Diego Alvarez','Electrician','ENG','#ff6a1f'],['Hana Kim','Chemist','BIO','#62de88'],['Olu Adeyemi','Roboticist','ENG','#ff6a1f'],['Freya Lund','Hydrologist','GEO','#ffc23d'],['Ravi Shah','Agronomist','BIO','#62de88'],['Elena Petrova','Radiologist','MED','#69d3ff'],['Kofi Boateng','Machinist','ENG','#ff6a1f']];
+const COPILOT='Jonas Weber';
+const DOME_STEPS=[['Unload the habitat kit',10],['Clear and level the site',12],['Anchor the foundation ring',12],['Inflate the pressure shell',14],['Connect life support',10],['Connect power',8],['Pressure and O₂ test',10],['Start the grow lights',6],['Move in',8]];
+const DOME_X=1004;
+const firstMission=()=>!(colony.settlers&&colony.settlers.length);
+const domeReady=()=>!colony.dome||colony.dome.stage>=DOME_STEPS.length;
+const isShelter=k=>MODS[k].shelter&&(k!=='hab'||domeReady());
+// older saves already have a base: give them the founders and a finished dome
+function migrateColony(){
+  if(!colony.settlers&&colony.mods&&colony.mods.length){colony.settlers=FOUNDERS.map(f=>({...f}));const extra=Math.max(0,Math.min(ARRIVALS.length,(colony.landings||1)*2-2));for(let i=0;i<extra;i++)colony.settlers.push(arrival(i));colony.dome={stage:DOME_STEPS.length,p:0};colony.sol=colony.sol||1+760*Math.max(0,(colony.landings||1)-1)}
+  colony.scout=colony.scout||{x:1180,hp:100,odo:0};
+}
+function arrival(i){const a=ARRIVALS[i%ARRIVALS.length];return{name:a[0],role:a[1],tag:a[2],suit:a[3],trait:'',bio:'Arrived on a later crewed mission.'}}
+const crewCap=()=>colN('hab')&&domeReady()?MODS.hab.crew[colN('hab')-1]+(colN('green')?MODS.green.crew[colN('green')-1]:0):4;
+// on touchdown: founders on the first mission, a couple of new arrivals later if there's room
+function colonyArrive(){
+  const out={msgs:[]};
+  if(firstMission()){colony.settlers=FOUNDERS.map(f=>({...f}));colony.dome={stage:0,p:0};colony.sol=1;out.founding=true;
+    out.msgs.push('Four settlers are staying. The Geo-dome goes up first.')}
+  else{
+    colony.sol=(colony.sol||1)+760;
+    if(colony.dome&&colony.dome.stage<DOME_STEPS.length){colony.dome.stage=DOME_STEPS.length;colony.dome.p=0;out.msgs.push('While you were away the crew finished the Geo-dome')}
+    let n=0;while(n<2&&colony.settlers.length<crewCap()){colony.settlers.push(arrival(colony.settlers.length-4));n++}
+    if(n)out.msgs.push(`${n} new settler${n>1?'s':''} arrived · population ${colony.settlers.length}`);
+    if(colony.scout){colony.scout.hp=Math.max(25,colony.scout.hp-rnd(6,14))}
+  }
+  return out;
+}
+/* ---- crew elevator and the build itself ---- */
+function stepFounding(dt){
+  const m=mining,D=colony.dome;if(!m||!D||D.stage>=DOME_STEPS.length)return;
+  if(m.elev!==undefined&&m.elev<8.5)m.elev+=dt;
+  const onSite=colonists?colonists.filter(c=>c.job&&!c.hidden&&!c.inside&&Math.abs(c.x-c.tx)<2).length:0;
+  if(D.stage===0){ // haul the packaged kit on its sled: it only moves with two people pulling
+    const x0=m.shipX-9,x1=DOME_X+8;m.crateX=m.crateX??x0;
+    const pull=colonists?colonists.filter(c=>!c.hidden&&Math.abs(c.x-m.crateX)<4.5).length:0;
+    if(!m.stormOn&&pull>=2){const d=Math.sign(x1-m.crateX);m.crateX+=d*Math.min(Math.abs(x1-m.crateX),1.5*dt)}
+    D.p=Math.abs(x0-x1)<1?1:clamp(1-Math.abs(x1-m.crateX)/Math.abs(x1-x0),0,1);
+    if(D.p<.999)return;D.p=1;
+  }
+  if(m.stormOn||!onSite&&D.stage>0)return;
+  if(D.stage>0)D.p+=dt*Math.min(1,onSite/3)/DOME_STEPS[D.stage][1];
+  if(D.p>=1){D.p=0;D.stage++;colSave();sfx('chime');
+    if(D.stage>=DOME_STEPS.length){toast('Geo-dome pressurised · crew moved in','var(--ok)');callout(`${FOUNDERS[0].name.split(' ')[0]} here. Dome is holding pressure at one bar and the crew is inside. Jezero Base is open.`)}
+    else{toast(`Geo-dome · ${D.stage}/${DOME_STEPS.length} · ${DOME_STEPS[D.stage-1][0]}`,'var(--cool)');
+      if(D.stage===3)callout('Foundation is anchored. Starting inflation.');if(D.stage===6)callout(`${FOUNDERS[3].name.split(' ')[0]}: power's live from the ship. Running the pressure test.`)}}
+  // dust while levelling, sparks while anchoring
+  if(D.stage===1&&Math.random()<.4)particles.push({x:DOME_X+rnd(-9,9),y:marsAt(DOME_X)+.2,vx:rnd(-2,2),vy:rnd(.5,2),life:1.4,max:1.4,size:rnd(.3,.8),col:'#c98a62',smoke:true,grow:1});
+  if(D.stage===2&&Math.random()<.25)particles.push({x:DOME_X+(Math.random()<.5?-1:1)*rnd(6,9),y:marsAt(DOME_X)+.3,vx:rnd(-2,2),vy:rnd(1,3),life:.4,max:.4,size:.12,col:'#ffd27a',add:true});
+}
+// where each founder should be for the current step
+function domeJob(c,i){
+  const D=colony.dome,m=mining;if(!D||D.stage>=DOME_STEPS.length||!m)return null;
+  if(D.stage===0){const cx=m.crateX??m.shipX-9,d=Math.sign(DOME_X-cx)||-1;return cx+d*(i<2?3:-3)+(i%2?.8:-.8)}
+  if(D.stage===5)return i===3?lerp(m.shipX-8,DOME_X+10,(Math.sin(performance.now()/1600)+1)/2):DOME_X+(i-1.5)*3;
+  if(D.stage===8)return DOME_X-5.5;
+  return DOME_X+[-7,-2.5,2.5,7][i%4];
+}
+function drawElevator(t){
+  const m=mining;if(!m||m.elev===undefined||m.elev>=8.5||!body)return;
+  const e=m.elev,x=body.x-6.2,g=marsAt(body.x),top=g+19;
+  const ph=e<3?e/3:e<5?1-(e-3)/2:e<8?(e-5)/3:1,y=lerp(top,g,ph*ph*(3-2*ph));
+  ctx.strokeStyle='#5b636a';ctx.lineWidth=.1;ctx.beginPath();ctx.moveTo(x-1,top+1);ctx.lineTo(x-1,y+2.6);ctx.moveTo(x+1,top+1);ctx.lineTo(x+1,y+2.6);ctx.stroke();
+  ctx.fillStyle='#3a4046';ctx.fillRect(x-1.4,y,2.8,.25);ctx.fillStyle='#ffc23d';ctx.fillRect(x-1.4,y+.25,2.8,.08);
+  ctx.strokeStyle='#8a939a';ctx.lineWidth=.08;ctx.strokeRect(x-1.3,y+.25,2.6,2.3);
+  ctx.fillStyle='#1d2126';ctx.fillRect(x-1.2,top-.4,2.4,2.8); // open hatch
+}
+function drawDomeSite(t){
+  const D=colony.dome,m=mining;if(!D||D.stage>=DOME_STEPS.length)return false;
+  const x=DOME_X,y=marsAt(x),s=D.stage,p=D.p,w=MODS.hab.w[0];
+  // packaged kit on its sled
+  if(s===0&&m){const cx=m.crateX??m.shipX-9;if(colonists&&colonists.some(c=>!c.hidden&&Math.abs(c.x-cx)<4.5)){ctx.strokeStyle='#cfc9bd';ctx.lineWidth=.05;ctx.beginPath();ctx.moveTo(cx-2,y+.9);ctx.lineTo(cx-3.2,y+1.3);ctx.stroke()}ctx.fillStyle='#e8e6e0';ctx.fillRect(cx-2,y+.35,4,2.2);ctx.fillStyle='#ff6a1f';ctx.fillRect(cx-2,y+1.9,4,.18);ctx.fillStyle='#3a3f44';ctx.fillRect(cx-2.4,y+.1,4.8,.25);wText('HAB-01',cx-1.6,y+1,.42,'#1d2024','left',700);return true}
+  if(s>=1){ctx.fillStyle='rgba(150,95,70,.9)';const lw=(w+6)*(s===1?p:1);ctx.fillRect(x-lw/2,y-.05,lw,.22)}
+  if(s===1&&m){ctx.fillStyle='#e8e6e0';ctx.fillRect(x+9,y+.35,4,2.2)}
+  if(s>=2){const n=12,k=s===2?Math.floor(p*n):n;ctx.fillStyle='#4a5158';for(let i=0;i<k;i++){const a=i/(n-1);ctx.fillRect(x-w*.42+a*w*.84-.5,y+.12,1,.4)}ctx.fillStyle='#2b3035';for(let i=0;i<k;i+=2){const a=i/(n-1);ctx.fillRect(x-w*.42+a*w*.84-.08,y-.4,.16,.55)}}
+  if(s>=3){const inf=s===3?p:1;ctx.save();ctx.translate(x,y);ctx.scale(1,lerp(.07,1,inf*inf*(3-2*inf)));ctx.translate(-x,-y);
+    dome(x-w*.12,y+.4,w*.32,w*.3,s===3&&inf<.9?['#a8a090','#d9d2c3','#b8b09e']:undefined);
+    if(s===3){ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=.08;for(let k=0;k<5;k++){ctx.beginPath();for(let q=-1;q<=1;q+=.1){const xx=x-w*.12+q*w*.3,yy=y+.4+w*.3*(1-q*q)*.9*(.35+k*.13)+Math.sin(q*12+k+t*2)*.25*(1-inf);q===-1?ctx.moveTo(xx,yy):ctx.lineTo(xx,yy)}ctx.stroke()}}
+    ctx.restore()}
+  if(s>=4){ctx.fillStyle='#d8dadc';ctx.fillRect(x+w*.24,y,2.6,1.8);ctx.fillStyle='#62de88';if((t*2|0)%2)ctx.fillRect(x+w*.24+2,y+1.3,.3,.3);ctx.strokeStyle='#8a939a';ctx.lineWidth=.18;ctx.beginPath();ctx.moveTo(x+w*.24,y+.8);ctx.lineTo(x+w*.12,y+.8);ctx.stroke()}
+  if(s>=5&&m){ctx.strokeStyle=s===5?'rgba(255,200,90,.9)':'#3a3f44';ctx.lineWidth=.14;ctx.setLineDash(s===5?[.5,.6]:[]);ctx.lineDashOffset=-t*4;ctx.beginPath();for(let q=Math.min(m.shipX-6,x+w*.3);q<=Math.max(m.shipX-6,x+w*.3);q+=2)ctx.lineTo(q,marsAt(q)+.1);ctx.stroke();ctx.setLineDash([])}
+  if(s===6){const pr=Math.min(1.01,p*1.2);wText(`${pr.toFixed(2)} BAR`,x-w*.12-1.6,y+w*.3+1.4,.7,pr>=1?'#62de88':'#ffc23d','left',700)}
+  if(s>=7){ctx.save();ctx.globalCompositeOperation='lighter';const gl=s===7?p:1;ctx.fillStyle=`rgba(200,110,255,${(.35*gl).toFixed(2)})`;for(let k=0;k<4;k++)ctx.fillRect(x-w*.12-w*.18+k*w*.11,y+w*.12,w*.05,.5);ctx.restore()}
+  if(s>=6){ctx.fillStyle='#1c1f22';ctx.fillRect(x-w*.12-w*.32+1.2,y+.4,2.6,2.6);ctx.fillStyle='#ffc23d';ctx.fillRect(x-w*.12-w*.32+1.1,y+.4,.12,2.6)}
+  return true;
+}
+function drawDomeChecklist(){
+  const D=colony.dome;if(S.phase!=='mining'||!D)return;
+  if(D.stage>=DOME_STEPS.length){if(!D.shownDone)return;}
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const x=12,y=82,w=Math.min(232,W*.6),lh=15,h=24+DOME_STEPS.length*lh;
+  ctx.fillStyle='rgba(6,10,15,.62)';ctx.fillRect(x,y,w,h);ctx.fillStyle='#ff6a1f';ctx.fillRect(x,y,2,h);
+  ctx.font='700 11px "Barlow",sans-serif';ctx.fillStyle='#f0f0fa';ctx.textAlign='left';ctx.fillText(`GEO-DOME · STEP ${Math.min(D.stage+1,DOME_STEPS.length)}/${DOME_STEPS.length}`,x+10,y+15);
+  if(mining&&mining.stormOn){ctx.fillStyle='#ff4b4b';ctx.textAlign='right';ctx.fillText('PAUSED · STORM',x+w-8,y+15);ctx.textAlign='left'}
+  DOME_STEPS.forEach(([name],i)=>{const yy=y+24+i*lh+9,done=i<D.stage,cur=i===D.stage;
+    ctx.font=`${cur?700:500} 10.5px "Barlow",sans-serif`;ctx.fillStyle=done?'#62de88':cur?'#f0f0fa':'rgba(240,240,250,.4)';
+    ctx.fillText(`${done?'✓':cur?'▸':'·'} ${name}`,x+10,yy);
+    if(cur){ctx.fillStyle='rgba(240,240,250,.15)';ctx.fillRect(x+w-56,yy-6,46,4);ctx.fillStyle='#ff6a1f';ctx.fillRect(x+w-56,yy-6,46*D.p,4)}});
+}
+/* ---- SCOUT-1: the weathered robotic rover that was here first ---- */
+function stepScout(dt){
+  const sc=colony.scout;if(!sc)return;
+  sc.tx=sc.tx??sc.x;sc.wait=(sc.wait??2)-dt;
+  if(Math.abs(sc.tx-sc.x)>.2){const d=Math.sign(sc.tx-sc.x);sc.x+=d*.45*dt*(sc.hp/100+.3);sc.dir=d;sc.odo=(sc.odo||0)+.45*dt}
+  else if(sc.wait<=0){sc.wait=rnd(4,10);sc.tx=clamp(sc.x+rnd(-40,40),1060,1390)}
+}
+function drawScout(t){
+  const sc=colony.scout;if(!sc)return;
+  const x=sc.x,y=marsAt(x),d=sc.dir||1,moving=Math.abs((sc.tx??x)-x)>.2;
+  // rocker-bogie, six wheels
+  ctx.strokeStyle='#5d5a54';ctx.lineWidth=.12;ctx.beginPath();ctx.moveTo(x-1.5,y+.35);ctx.lineTo(x-.4,y+.95);ctx.lineTo(x+1.5,y+.35);ctx.moveTo(x-.1,y+.35);ctx.lineTo(x-.4,y+.95);ctx.stroke();
+  for(const dx of[-1.5,-.1,1.5]){ctx.fillStyle='#3a3530';ctx.beginPath();ctx.arc(x+dx,y+.33,.33,0,6.283);ctx.fill();ctx.strokeStyle='#8a7a68';ctx.lineWidth=.05;const a=moving?t*3*d:0;ctx.beginPath();ctx.moveTo(x+dx,y+.33);ctx.lineTo(x+dx+Math.cos(a)*.3,y+.33+Math.sin(a)*.3);ctx.stroke()}
+  // body: once-white, now dust-stained
+  const g=ctx.createLinearGradient(0,y+.9,0,y+1.6);g.addColorStop(0,'#b7a28c');g.addColorStop(1,'#d8cbb8');ctx.fillStyle=g;ctx.fillRect(x-1.6,y+.9,3.2,.7);
+  ctx.fillStyle='rgba(150,85,50,.35)';ctx.fillRect(x-1.6,y+.9,3.2,.22);ctx.fillStyle='rgba(60,40,30,.5)';ctx.fillRect(x-1.2,y+1.2,.5,.05);ctx.fillRect(x+.4,y+1.35,.7,.04);
+  // dusty solar deck, tilted
+  ctx.fillStyle='#3d3a40';ctx.fillRect(x-1.8,y+1.6,3.6,.12);ctx.fillStyle='rgba(180,110,70,.6)';ctx.fillRect(x-1.8,y+1.6,3.6,.12);
+  // mast with camera head that pans
+  ctx.fillStyle='#cfc4b2';ctx.fillRect(x+d*1-.05,y+1.6,.1,1.5);ctx.save();ctx.translate(x+d*1,y+3.15);ctx.rotate(Math.sin(t*.4)*.3);ctx.fillStyle='#d9cfbf';ctx.fillRect(-.35,-.15,.7,.32);ctx.fillStyle='#14171a';ctx.fillRect(d*.18-.08,-.08,.16,.16);ctx.restore();
+  // high-gain dish + low-gain whip
+  ctx.fillStyle='#cfc4b2';ctx.beginPath();ctx.ellipse(x-d*.9,y+2.05,.38,.12,-.4*d,0,6.283);ctx.fill();ctx.strokeStyle='#bba';ctx.lineWidth=.04;ctx.beginPath();ctx.moveTo(x-d*1.4,y+1.7);ctx.lineTo(x-d*1.5,y+2.8);ctx.stroke();
+  if(((t*1.2)|0)%2){ctx.fillStyle=sc.hp<40?'#ffc23d':'#62de88';ctx.fillRect(x-.2,y+1.75,.14,.14)}
+  if(pxPerM()>6)wText('SCOUT-1',x-1.3,y+1.05,.35,'#3a3530','left',700);
+  // landing beacon it set out for the first crew
+  if(firstMission()&&S.phase==='marsLand'){const bx=BASE_X;const by=marsAt(bx);ctx.fillStyle='#c7ccd0';ctx.fillRect(bx-.06,by,.12,2.6);if(((t*2)|0)%2){ctx.save();ctx.globalCompositeOperation='lighter';ctx.fillStyle='rgba(98,222,136,.9)';ctx.beginPath();ctx.arc(bx,by+2.8,.35,0,6.283);ctx.fill();ctx.fillStyle='rgba(98,222,136,.25)';ctx.beginPath();ctx.arc(bx,by+2.8,2.2,0,6.283);ctx.fill();ctx.restore()}}
+}
+
+const colPop=()=>colony.settlers?colony.settlers.length:0;
 let colonists=null;
-function spawnColonists(){
+function spawnColonists(founding){
   const n=colPop(),R=seeded(7+n),sites=colBuilt().filter(k=>k!=='pad').map(modX).concat(BASE_X-40,BASE_X+60);
   colonists=[];
-  for(let i=0;i<n;i++){const x=sites[i%sites.length]+(R()-.5)*20;colonists.push({x,tx:x,v:.9+R()*.6,dir:1,walk:R()*6,idle:R()*3,work:false,suit:['#ff6a1f','#69d3ff','#ffc23d','#62de88'][i%4]})}
+  for(let i=0;i<n;i++){const who=colony.settlers[i];let x=sites[i%sites.length]+(R()-.5)*20;
+    const c={x,tx:x,v:.9+R()*.6,dir:1,walk:R()*6,idle:R()*3,work:false,who,suit:who?who.suit:'#ff6a1f'};
+    if(founding){if(mining&&mining.elev!==undefined){c.hidden=true;c.delay=i<2?3:8;c.x=c.tx=mining.shipX-6.2}else{c.x=c.tx=DOME_X+(i-1.5)*3}}
+    else if(!domeReady()){c.x=c.tx=DOME_X+(i-1.5)*3}
+    colonists.push(c)}
 }
 function stepColonists(dt){
   if(!colonists)return;
   const b=BUILDS[colony.builds||0],site=b?b.x:null,sites=colBuilt().filter(k=>k!=='pad').map(modX).concat(BASE_X-40,BASE_X+60,body?body.x+14:BASE_X);
   const surf=S.phase==='mining';
+  const D=colony.dome,building=surf&&D&&!domeReady();
   colonists.forEach((c,i)=>{
-    c.work=surf&&site!==null&&i<4&&!(mining&&mining.stormOn);
-    if(mining&&mining.stormOn){const sh=colBuilt().filter(k=>MODS[k].shelter).map(modX);c.tx=sh.length?sh[i%sh.length]:body.x}
+    if(c.hidden){if(c.delay!==undefined&&(c.delay-=dt)<=0){c.hidden=false;c.delay=undefined;c.x=c.tx=(mining?mining.shipX:BASE_X)-6.2}return}
+    if(building&&!(mining&&mining.stormOn)&&i<4){const jx=domeJob(c,i);c.job=true;c.work=true;c.tx=jx;
+      if(D.stage===8&&D.p>.4&&Math.abs(c.x-jx)<1.5)c.inside=true;
+      if(Math.abs(c.tx-c.x)>.3){c.dir=Math.sign(c.tx-c.x);c.x+=c.dir*Math.min(Math.abs(c.tx-c.x)/dt,c.v*1.6)*dt;c.walk+=dt*c.v*4}
+      return}
+    c.job=false;if(domeReady())c.inside=false;
+    c.work=surf&&domeReady()&&site!==null&&i<4&&!(mining&&mining.stormOn);
+    if(mining&&mining.stormOn){const sh=colBuilt().filter(isShelter).map(modX);c.tx=sh.length?sh[i%sh.length]:body.x-6}
     else if(c.work)c.tx=site+(i-1.5)*2.2;
     if(Math.abs(c.tx-c.x)>.3){c.dir=Math.sign(c.tx-c.x);c.x+=c.dir*c.v*dt*(mining&&mining.stormOn?2:1);c.walk+=dt*c.v*4}
     else if(!c.work&&(c.idle-=dt)<=0){c.idle=rnd(2,7);c.tx=sites[Math.floor(Math.random()*sites.length)]+rnd(-9,9)}
   });
-  if(surf&&b&&!(mining&&mining.stormOn)){
+  if(surf&&b&&domeReady()&&!(mining&&mining.stormOn)){
     const workers=Math.min(4,colonists.length);
     colony.bprog=(colony.bprog||0)+dt*workers/240;
     if(colony.bprog>=1){colony.bprog=0;colony.builds=(colony.builds||0)+1;colSave();toast(`Colonists finished the ${b.name}`,'var(--ok)');sfx('chime');callout(`Base update: the crew has finished the ${b.name}.`)}
   }
 }
 function drawCrew(c,t){
-  const sheltered=mining&&mining.stormOn&&modAt(c.x,true,0);
-  if(sheltered)return;
+  const sheltered=mining&&mining.stormOn&&(modAt(c.x,true,0)||body&&Math.abs(c.x-body.x+6)<1.5);
+  if(sheltered||c.hidden||c.inside)return;
   const x=c.x,y=marsAt(x),d=c.dir,sw=Math.abs(c.tx-c.x)>.3?Math.sin(c.walk)*.35:0;
   ctx.lineCap='round';
   // legs: white with black knee/boot
@@ -2510,6 +2683,7 @@ function drawCrew(c,t){
   ctx.fillStyle='#f6f7f9';ctx.beginPath();ctx.arc(x,y+1.8,.23,0,6.283);ctx.fill();
   ctx.fillStyle='#14171b';ctx.beginPath();ctx.ellipse(x+d*.07,y+1.8,.16,.13,0,0,6.283);ctx.fill();
   ctx.fillStyle='rgba(170,215,255,.6)';ctx.fillRect(x+d*.09-.04,y+1.84,.08,.03);
+  if(c.who&&pxPerM()>9){ctx.fillStyle='rgba(6,10,15,.55)';const nm=c.who.name.split(' ')[0];ctx.fillRect(x-.9,y+2.25,1.8,.42);ctx.fillStyle=c.suit;ctx.fillRect(x-.9,y+2.25,.08,.42);wText(`${nm} · ${c.who.tag}`,x-.75,y+2.37,.24,'#f0f0fa','left',600)}
   if(c.work&&Math.random()<.25&&particles.length<480)particles.push({x:x+d*.5,y:y+1.3,vx:rnd(-2,2),vy:rnd(0,2),life:.3,max:.3,size:.08,col:'#ffe08a',add:true});
   ctx.lineCap='butt';
 }
@@ -2841,7 +3015,7 @@ function drawWorld(z){
   if(S.phase==='mining'&&mining){
     for(const [type,label,col] of[['ice','ICE','#69d3ff'],['iron','HEMATITE','#ffb27a'],['sample','SAMPLE','#ffd27a']]){let best=null,bd=1e9;for(const d of mining.deps)if(d.type===type&&d.left>.05){const dd=Math.abs(d.x-rx);if(dd<bd){bd=dd;best=d}}if(best)marks.push([best.x,label,col])}
     if(mining.rover==='out')marks.push([body.x+9,'SHIP','#62de88']);
-    if(mining.stormOn&&mining.rover==='out'){const sh=colBuilt().filter(k=>MODS[k].shelter).sort((a,b)=>Math.abs(modX(a)-rx)-Math.abs(modX(b)-rx))[0];if(sh)marks.push([modX(sh),'SHELTER','#ff6a1f'])}
+    if(mining.stormOn&&mining.rover==='out'){const sh=colBuilt().filter(isShelter).sort((a,b)=>Math.abs(modX(a)-rx)-Math.abs(modX(b)-rx))[0];if(sh)marks.push([modX(sh),'SHELTER','#ff6a1f'])}
   }
   let row=0;
   for(const [tx,label,col] of marks){
@@ -2872,7 +3046,7 @@ function drawWorld(z){
   if(planet===MARS&&!inLeo&&stormK()>0){const k=stormK();ctx.fillStyle=`rgba(150,85,50,${(k*.55).toFixed(3)})`;ctx.fillRect(0,0,W,H);
     ctx.strokeStyle=`rgba(230,170,120,${(.35*k).toFixed(3)})`;ctx.lineWidth=1;const tt=performance.now()/1000;
     for(let i=0;i<60*k;i++){const y=(i*97.13)%H,x=((i*233.7+tt*(500+i*7))%(W+120))-60;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+40,y+6);ctx.stroke()}}
-  drawSchoolGuides(z);drawTac(z);
+  drawSchoolGuides(z);drawTac(z);drawDomeChecklist();
   if(S.flash>0){ctx.fillStyle=`rgba(255,240,215,${(Math.min(1,S.flash)*.55).toFixed(3)})`;ctx.fillRect(0,0,W,H)}
 }
 const sScale=()=>Math.min(W,H*0.8)/420;
@@ -3090,6 +3264,8 @@ function drawTac(z){
         else if(need>net*.55)cues.push([`LANDING BURN IN ~${Math.max(1,Math.round((h-vd*vd/(2*net*.85))/vd))}s`,TC.warn]);
       }
     }
+    if(S.phase==='reentry'&&!b.stacked){const live=ship.engines.filter(e=>!e.dmg&&(mode==='ALL'||mode===e.type)),burn=live.reduce((q,e)=>q+(e.type==='SL'?ENG.SL.fuelAtm:ENG.VAC.fuel),0)*RK.fuel*.55;
+      if(burn>0){const secs=ship.fuel/burn;if(secs<25)cues.push([`LANDING FUEL ≈ ${Math.max(0,secs).toFixed(0)} s OF BURN`,secs<8?TC.bad:secs<14?TC.warn:TC.c,secs<8])}}
     cues.forEach(([t,c,bl],i)=>tacChip(bx,Math.min(H-120,by+sr+40+i*24),t,c,bl,now));
     if(S.sats&&S.sats.length){
       for(const o of S.sats){const [sx,sy]=toS(o.x,o.y);if(vis(sx,sy,20))tacBracket(sx,sy,6+4*z,TC.bad,o,now)}
@@ -3230,7 +3406,7 @@ function frameInner(now){
     else if(['launch','marsLand','marsAscent','reentry','school'].includes(S.phase)){const warp=S.phase==='marsLand'&&body&&body.chute&&!body.grounded&&body.y-marsAt(body.x)>120?6:1;S.warp=warp;for(let i=0;i<warp&&['launch','marsLand','marsAscent','reentry','school'].includes(S.phase);i++){S.clock+=dt;flight(dt)}if(S.phase==='school')stepSchool()}
     else if(S.phase==='toMars'||S.phase==='toEarth'){S.clock+=dt;stepTransfer(dt)}
     else if(S.phase==='coast'&&tr)stepTransfer(dt);
-    else if(S.phase==='mining'){S.clock+=dt;stepSurface(dt)}
+    else if(S.phase==='mining'){S.clock+=dt;stepSurface(dt);stepFounding(dt);stepScout(dt)}
     else if(S.phase==='leo'){S.clock+=dt;stepLeo(dt)}
     if(colonists&&planet===MARS)stepColonists(dt);
     if(['launch','toMars','toEarth','marsLand','mining','marsAscent','reentry'].includes(S.phase)&&!(S.count>0))stepAnomaly(dt);
@@ -3248,8 +3424,10 @@ function frameInner(now){
   else{
     // camera
     if(S.phase==='mining'&&mining){
-      const m=mining,out=m.rover==='out'&&m.bg,tx=out?m.bg.x+m.bg.vx*.9:m.rover==='shelter'?modX(m.shelter):body.x+6,ty=out?m.bg.y+7:marsAt(tx)+(m.rover==='shelter'?9:16);
-      const zt=sScale()*(out?5.2:3.3)*userZoom;
+      const m=mining,out=m.rover==='out'&&m.bg,watch=!out&&m.rover!=='shelter'&&colony.dome&&!domeReady();
+      const fx=watch?(colony.dome.stage===0?(m.crateX??body.x):DOME_X):0; // frame the ship and the crew's work site together
+      const tx=out?m.bg.x+m.bg.vx*.9:m.rover==='shelter'?modX(m.shelter):watch?(body.x+fx)/2:body.x+6,ty=out?m.bg.y+7:marsAt(tx)+(m.rover==='shelter'?9:watch?12:16);
+      const zt=watch?Math.min(sScale()*3.3,(W*.8)/(Math.abs(body.x-fx)+46))*userZoom:sScale()*(out?5.2:3.3)*userZoom;
       cam.z=cam.z?lerp(cam.z,zt,Math.min(1,dt*2.5)):zt;
       cam.lx=lerp(cam.lx??tx,tx,Math.min(1,dt*2.4));cam.ly=lerp(cam.ly??ty,ty,Math.min(1,dt*2.4));cam.x=cam.lx;cam.y=cam.ly;
     }else if(leo&&(S.phase==='leo'||S.phase==='coast')&&body){
@@ -3278,6 +3456,7 @@ buildEngChips=function(){_build();[...$('engs').children].forEach(c=>c.dataset.l
 /* ---------- boot ---------- */
 window.claude?.hot?.snapshot?.(()=>({cp:S.cp,cpPhase:S.cpPhase,rk:RK.id,clock:S.clock}));
 function boot(d){
+  migrateColony();
   if(d&&d.cp&&d.cpPhase){setRocket(d.rk||d.cp.rk||'starship');S.clock=d.clock||0;S.cp=d.cp;S.cpPhase=d.cpPhase;ship=clone(d.cp);buildEngChips();menuBg();briefing(d.cpPhase)}
   else menu();
   requestAnimationFrame(t=>{last=t;frame(t)});
