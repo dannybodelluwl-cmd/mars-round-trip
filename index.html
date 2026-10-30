@@ -166,6 +166,22 @@ body.badge.surface #capcom{bottom:calc(234px + env(safe-area-inset-bottom,0px))}
 .base .mini{border:1px solid #3a4654;background:transparent;border-radius:6px;font-size:10px;padding:4px 8px;color:var(--dim)}
 .base .mini.arm{border-color:var(--bad);color:var(--bad)}
 .toggles{display:flex;gap:8px;flex-wrap:wrap}
+.setg{display:grid;gap:12px;margin:14px 0 10px}
+.setr{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.setr label{font-family:var(--din,inherit);font-weight:600;font-size:12px;letter-spacing:.14em;text-transform:uppercase;min-width:104px;color:rgba(240,240,250,.75)}
+.setr input[type=range]{flex:1;min-width:120px;accent-color:#f0f0fa;height:28px}
+.setr output{font-family:"IBM Plex Mono",monospace;font-size:12px;width:40px;text-align:right;color:rgba(240,240,250,.75)}
+.setr .tg{font-size:12px;padding:8px 12px}
+.howg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 18px;margin:10px 0 14px}
+.howg h4{margin:0 0 3px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#fff}
+.howg p{margin:0;font-size:13px;line-height:1.45;color:rgba(240,240,250,.78)}
+.credg{display:grid;gap:12px;margin:12px 0 14px}
+.credg small{display:block;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(240,240,250,.55)}
+.credg b{display:block;font-weight:600;font-size:15px}.credg span{font-size:12px;color:rgba(240,240,250,.6)}
+.fbg{display:grid;gap:8px;margin:10px 0 14px}
+.fbg textarea,.fbg input{width:100%;box-sizing:border-box;background:rgba(240,240,250,.06);border:1px solid rgba(240,240,250,.3);border-radius:8px;color:#f0f0fa;font:14px/1.4 "Barlow",sans-serif;padding:10px;resize:vertical}
+.fbg textarea:focus,.fbg input:focus{outline:none;border-color:#f0f0fa}
+.pzb .btn{flex:1 1 45%}
 .tg{border:1px solid #3a4654;background:transparent;border-radius:6px;font-size:11px;padding:6px 10px;color:var(--fg)}
 .tg[aria-pressed="false"]{color:var(--dim)}
 .tg[aria-pressed="true"]{border-color:var(--cool)}
@@ -181,6 +197,9 @@ body.badge.surface #capcom{bottom:calc(234px + env(safe-area-inset-bottom,0px))}
 .ov{background:linear-gradient(90deg,rgba(0,0,0,.94) 0%,rgba(0,0,0,.86) 48%,rgba(0,0,0,.38) 100%);backdrop-filter:none;place-items:center start;padding:40px max(40px,env(safe-area-inset-right,0px)) 40px max(40px,env(safe-area-inset-left,0px))}
 @media (max-width:760px){.ov{background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.9) 40%);place-items:start center;padding:24px max(20px,env(safe-area-inset-right,0px)) 24px max(20px,env(safe-area-inset-left,0px))}}
 .card{width:min(560px,100%);background:transparent;border:0;border-radius:0;padding:8px 0 24px;gap:18px;font-family:var(--din);color:var(--sw)}
+.ov{place-items:start}.card{margin:auto 0} /* tall cards scroll from the top instead of clipping */
+@media (max-width:760px){.ov{justify-items:center}}
+body.ovopen #hud,body.ovopen #ctl,body.ovopen #mine,body.ovopen #capcom{opacity:.12;transition:opacity .2s}
 .card h1,.card h2{font-family:var(--din);font-weight:700;color:var(--sw);letter-spacing:.03em}
 .card h1{font-size:clamp(46px,9vw,78px);line-height:.92}
 .card h2{font-size:clamp(30px,6.5vw,44px)}
@@ -231,7 +250,7 @@ canvas.cgart{display:block;width:calc(100% + 12px);margin:-8px -6px 6px;aspect-r
   <div id="hud" hidden>
     <div class="top">
       <div id="ph">Earth Ascent<small id="obj"></small></div>
-      <div class="tr"><div id="clock">T+00:00</div><button id="crewB" aria-label="Crew and priorities">CREW</button><button id="rst" aria-label="Restart or pause">↻<span class="lbl"> RESTART</span></button><button id="tac" aria-label="Toggle tactical HUD">HUD</button><button id="snd" aria-label="Toggle sound">SOUND</button></div>
+      <div class="tr"><div id="clock">T+00:00</div><button id="crewB" aria-label="Crew and priorities">CREW</button><button id="rst" aria-label="Pause">❚❚<span class="lbl"> PAUSE</span></button><button id="tac" aria-label="Toggle tactical HUD">HUD</button><button id="snd" aria-label="Toggle sound">SOUND</button></div>
     </div>
     <div class="side left" id="sideL">
       <div class="cell" id="rA"><span class="k" id="kA">ALT</span><b id="vA">0</b><small id="tA"></small></div>
@@ -271,6 +290,7 @@ canvas.cgart{display:block;width:calc(100% + 12px);margin:-8px -6px 6px;aspect-r
     </div>
     <div class="mbig"><button class="arrow" data-k="left" aria-label="Drive left">◀</button><button class="arrow" data-k="right" aria-label="Drive right">▶</button><button id="bDo">Dig</button><button id="bEva" aria-label="EVA on foot">EVA</button><button id="bLaunch">Launch</button></div>
   </div>
+  <form name="feedback" data-netlify="true" netlify-honeypot="bot" hidden><input name="bot"><textarea name="message"></textarea><input name="contact"><input name="context"></form>
   <div class="ov" id="ov" hidden><div class="card" id="card"></div></div>
 </div>
 
@@ -465,9 +485,9 @@ function stepAnomaly(dt){
 }
 
 /* ---------- audio: synthesised engines, comms tones and callouts ---------- */
-const AU={ctx:null,on:true,voice:true,vname:'',last:{}};
-try{const p=JSON.parse(localStorage.getItem('mrt.audio')||'{}');if(p.on===false)AU.on=false;if(p.voice===false)AU.voice=false;if(p.vname)AU.vname=p.vname}catch(e){}
-function auSave(){try{localStorage.setItem('mrt.audio',JSON.stringify({on:AU.on,voice:AU.voice,vname:AU.vname}))}catch(e){}}
+const AU={ctx:null,on:true,voice:true,vname:'',vol:{music:.6,sfx:1,voice:1},last:{}};
+try{const p=JSON.parse(localStorage.getItem('mrt.audio')||'{}');if(p.on===false)AU.on=false;if(p.voice===false)AU.voice=false;if(p.vname)AU.vname=p.vname;if(p.vol)Object.assign(AU.vol,p.vol)}catch(e){}
+function auSave(){try{localStorage.setItem('mrt.audio',JSON.stringify({on:AU.on,voice:AU.voice,vname:AU.vname,vol:AU.vol}))}catch(e){}}
 // pick the most natural free voice this device offers: Edge/Windows neural, Google, Apple premium/enhanced, then any English
 function voiceScore(v){
   if(!/^en/i.test(v.lang))return -1;const n=v.name;let s=0;
@@ -486,13 +506,24 @@ function curVoice(){if(!VOICES.length)loadVoices();return VOICES.find(v=>v.name=
 const voiceLabel=()=>{const v=curVoice();return v?v.name.replace(/^Microsoft\s+|^Google\s+|\s*\(.*\)|\s*Online|\s*-\s*English.*$/gi,'').trim().slice(0,22):'default'};
 let sayTimers=[];
 function hushVoice(){sayTimers.forEach(clearTimeout);sayTimers=[];try{speechSynthesis.cancel()}catch(e){}}
+// Coming back to the tab: phones (iOS especially) only let audio restart inside a tap, and Safari can leave the
+// context 'interrupted' rather than 'suspended'. So every tap/key checks it, and if a resume doesn't take, the next tap rebuilds it.
+function auWake(){
+  if(!AU.ctx||AU.rebuild){if(AU.ctx){try{AU.ctx.close()}catch(e){}AU.ctx=null}AU.rebuild=false;auInit();return}
+  const a=AU.ctx;if(a.state==='running')return;
+  a.resume().catch(()=>{});
+  try{const b=a.createBuffer(1,1,22050),q=a.createBufferSource();q.buffer=b;q.connect(a.destination);q.start(0)}catch(e){} // the iOS unlock nudge
+  clearTimeout(AU.wk);AU.wk=setTimeout(()=>{if(AU.ctx&&AU.ctx.state!=='running'&&!document.hidden)AU.rebuild=true},700);
+}
 function auInit(){
-  if(AU.ctx){if(AU.ctx.state==='suspended')AU.ctx.resume().catch(()=>{});return}
+  if(AU.ctx){auWake();return}
   try{
     const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
     const a=new C();AU.ctx=a;
     const comp=a.createDynamicsCompressor();comp.threshold.value=-16;comp.ratio.value=5;comp.connect(a.destination);
-    AU.master=a.createGain();AU.master.gain.value=AU.on?.85:0;AU.master.connect(comp);
+    AU.out=a.createGain();AU.out.gain.value=AU.on?.85:0;AU.out.connect(comp);       // master on/off
+    AU.master=a.createGain();AU.master.gain.value=AU.vol.sfx;AU.master.connect(AU.out); // effects bus
+    musInit(a);
     const n=a.sampleRate*2;
     const wb=a.createBuffer(1,n,a.sampleRate),w=wb.getChannelData(0);for(let i=0;i<n;i++)w[i]=Math.random()*2-1;AU.white=wb;
     const bb=a.createBuffer(1,n,a.sampleRate),b=bb.getChannelData(0);let l=0;for(let i=0;i<n;i++){l=(l+0.02*(Math.random()*2-1))/1.02;b[i]=l*3.5}AU.brown=bb;
@@ -556,7 +587,7 @@ function say(text,urgent){
     if(ss.speaking||ss.pending){if(!urgent)return;ss.cancel()}
     const u=new SpeechSynthesisUtterance(text),v=curVoice();
     const neural=v&&/natural|neural|premium|enhanced|siri/i.test(v.name);
-    u.rate=neural?1.04:1.07;u.pitch=neural?1:.92;u.volume=.95;if(v){u.voice=v;u.lang=v.lang}
+    u.rate=neural?1.04:1.07;u.pitch=neural?1:.92;u.volume=.95*AU.vol.voice;if(v){u.voice=v;u.lang=v.lang}
     ss.speak(u);
   }catch(e){}
 }
@@ -569,9 +600,61 @@ function callout(text,alert){
   sayTimers.push(setTimeout(()=>say(text,alert),d));
   sayTimers.push(setTimeout(()=>sfx('qout'),d+text.length*60+450));
 }
+/* ---------- generated score: slow pipe-organ chords, a ticking pulse and arpeggios that swell with the action ---------- */
+const MUS={next:0,arp:0,tick:0,i:0,int:.4,ai:0};
+const PROG=[[45,57,64,69,72],[41,53,60,65,69],[48,55,60,64,67],[40,52,59,64,67],[45,57,64,69,72],[41,53,60,65,69],[38,50,57,62,65],[40,52,59,64,68]]; // Am F C Em · Am F Dm E
+const mtof=n=>440*Math.pow(2,(n-69)/12);
+function musInit(a){
+  MUS.next=MUS.arp=MUS.tick=0;
+  AU.mus=a.createGain();AU.mus.gain.value=0;
+  const lp=a.createBiquadFilter();lp.type='lowpass';lp.frequency.value=2200;AU.musLP=lp;
+  // a big stone-hall reverb from a decaying noise impulse
+  const len=a.sampleRate*4.5,ir=a.createBuffer(2,len,a.sampleRate);
+  for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3.2)}
+  const rv=a.createConvolver();rv.buffer=ir;const wet=a.createGain();wet.gain.value=.55;const dry=a.createGain();dry.gain.value=.5;
+  AU.mus.connect(lp);lp.connect(dry);lp.connect(rv);rv.connect(wet);dry.connect(AU.out);wet.connect(AU.out);
+  // organ voice: flue pipes at 8', 4', 2 2/3', 2' and a touch of 1'
+  const re=new Float32Array([0,1,.55,.32,.2,0,.07,0,.04]),im=new Float32Array(re.length);
+  AU.organ=a.createPeriodicWave(im,re);
+}
+function musNote(f,t,dur,vol,{att=2.2,rel=3,wave='organ'}={}){
+  const a=AU.ctx,o=a.createOscillator(),g=a.createGain();
+  if(wave==='organ')o.setPeriodicWave(AU.organ);else o.type=wave;
+  o.frequency.value=f;o.detune.value=(Math.random()-.5)*6;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+att);g.gain.setValueAtTime(vol,t+Math.max(att,dur-rel));g.gain.linearRampToValueAtTime(0,t+dur);
+  o.connect(g);g.connect(AU.mus);o.start(t);o.stop(t+dur+.1);
+}
+function musTarget(){
+  const P=S.phase,m=mining;if(body&&body.dead)return .15;
+  if(P==='menu')return .45;
+  if(P==='launch')return S.count>0?.7:1;
+  if(P==='marsLand'||P==='reentry'||P==='marsAscent')return .9;
+  if(P==='school')return .55;
+  if(P==='mining')return m&&(m.stormOn||m.creak)?.75:.3;
+  return .3; // orbit, the long coast between worlds, parked on a planet
+}
+function musStep(){
+  const a=AU.ctx;if(!a||!AU.mus||a.state!=='running')return;
+  MUS.int+=(musTarget()-MUS.int)*.008;const I=MUS.int,now=a.currentTime;
+  auSet(AU.mus,AU.vol.music*(.22+.5*I),.8);auF(AU.musLP.frequency,900+2600*I,1);
+  if(MUS.next<now)MUS.next=now+.1;
+  // chords: one every 8 s, overlapping so the organ never breathes
+  while(MUS.next<now+.4){const ch=PROG[MUS.i%PROG.length],t=MUS.next;
+    musNote(mtof(ch[0]-12),t,10,.07,{att:3,rel:3.5,wave:'sine'});
+    ch.forEach((n,k)=>musNote(mtof(n),t,10,k?.022:.03,{att:2.6,rel:3.2}));
+    MUS.ai=0;MUS.i++;MUS.next+=8}
+  // the pulse: a rising arpeggio and a clock tick, only when things get tense
+  if(MUS.arp<now)MUS.arp=now+.05;
+  while(MUS.arp<now+.3){const t=MUS.arp,ch=PROG[(MUS.i+PROG.length-1)%PROG.length],pat=[1,2,3,4,3,2],n=ch[pat[MUS.ai++%pat.length]]+12;
+    if(I>.5)musNote(mtof(n),t,.9,.03*(I-.5)*2,{att:.01,rel:.85,wave:'triangle'});MUS.arp+=.3}
+  if(MUS.tick<now)MUS.tick=now+.05;
+  while(MUS.tick<now+.3){const t=MUS.tick;if(I>.6&&AU.white){const q=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();q.buffer=AU.white;f.type='highpass';f.frequency.value=4500;
+      g.gain.setValueAtTime(.05*(I-.6)*2.5,t);g.gain.exponentialRampToValueAtTime(.001,t+.05);q.connect(f);f.connect(g);g.connect(AU.mus);q.start(t,Math.random());q.stop(t+.07)}
+    MUS.tick+=1.2}
+}
 function auUpdate(){
   if(!AU.ctx)return;
-  auSet(AU.master,AU.on?.85:0,.1);
+  auSet(AU.out,AU.on?.85:0,.1);auSet(AU.master,AU.vol.sfx,.1);musStep();
   const live=!S.paused&&body&&!body.dead&&!tr&&['launch','leo','marsLand','marsAscent','reentry','coast','landed','school'].includes(S.phase);
   let thr=0,air=0,v=0;
   if(live){
@@ -596,7 +679,7 @@ function auUpdate(){
   auSet(AU.humG,m&&m.ref&&m.ref.busy?.045:0,.3);
   auSet(AU.digG,m&&m.digNow?.16:0,.05);
 }
-addEventListener('pointerdown',auInit,{capture:true});addEventListener('keydown',auInit,{capture:true});
+['pointerdown','touchend','keydown','click'].forEach(ev=>addEventListener(ev,auWake,{capture:true}));
 
 /* ---------- toast ---------- */
 let toastT=0;
@@ -1253,10 +1336,11 @@ function menu(){
     <div class="base"><div class="row2"><h3>Jezero Base${colony.sol?` · Sol ${colony.sol}`:''}</h3>${colony.mods.length?'<button class="mini" id="rsb">Reset base</button>':''}</div>
       ${colony.settlers&&colony.settlers.length?`<div class="roster">${colony.settlers.slice(0,8).map(p=>`<div><b style="color:${p.suit}">▍</b><b>${p.name}</b><span>${p.role}</span></div>`).join('')}${colony.settlers.length>8?`<div><span>+ ${colony.settlers.length-8} more</span></div>`:''}</div>`:''}
       ${colony.dome&&!domeReady()?`<div>Geo-dome under construction · step ${colony.dome.stage+1} of ${DOME_STEPS.length}: ${DOME_STEPS[colony.dome.stage][0].toLowerCase()}</div>`:''}
+      ${colony.mat&&Object.values(colony.mat).some(v=>v>=1)?`<div>Mineral store · ${Object.entries(colony.mat).filter(([,v])=>v>=1).map(([k,v])=>{const q=MAT.find(q=>q&&q.id===k);return `${Math.round(v)} ${q?q.name.toLowerCase():k}`}).join(', ')} · <span style="color:var(--cool)">processing coming soon</span></div>`:''}
       ${colony.scout?`<div>SCOUT-1 robotic rover · ${Math.round(colony.scout.hp)}% health · ${Math.round(colony.scout.odo||0)} m driven</div>`:''}
       <div>${colBuilt().length?`${colBuilt().length} building${colBuilt().length===1?'':'s'} · crew of ${colCrew()} · ${colBuilt().map(k=>MODS[k].short+(modMax(k)>1?' L'+colN(k):'')).join(', ')}${colPop()?` · ${colPop()} colonists`:''}${colony.builds?` · ${colony.builds} crew projects`:''}${colony.samples?` · ${colony.samples} sample tube${colony.samples>1?'s':''} returned`:''}`:'Every rocket that lands on Mars delivers its cargo here. Sending the same module again upgrades it, up to level 3.'}</div></div>
     <div class="keys">${SAVE.cloud?'Progress saves to your Claude account at every phase, so you can pick up on another device.':'Progress saves in this browser at every phase.'}</div>
-    <div class="toggles"><button class="tg" id="tgS" aria-pressed="${AU.on}">Sound: ${AU.on?'on':'off'}</button><button class="tg" id="tgV" aria-pressed="${AU.voice}">Voice callouts: ${AU.voice?'on':'off'}</button>${AU.voice&&VOICES.length>1?`<button class="tg" id="tgVN" title="Tap to try the next voice on this device">Voice: ${voiceLabel()} ▸</button>`:''}</div>
+    <div class="toggles"><button class="tg" id="mSet">Settings</button><button class="tg" id="mHow">How to play</button><button class="tg" id="mCred">Credits</button><button class="tg" id="mFb">Feedback</button><button class="tg" id="tgS" aria-pressed="${AU.on}">Sound ${AU.on?'on':'off'}</button></div>
     <div class="btns"><button class="btn" id="start">Light the candle</button><button class="btn ghost" id="fs2">Flight school</button></div>
     <div class="keys">Flight: ← → rotate · ↑ or Space thrust · E engine mode · S stage · P chute · M mine (in orbit) · +/− zoom<br>Rover: ← → drive · Space for the action button · L launch</div>`);
     document.querySelectorAll('.cg').forEach(b=>{b.onclick=()=>{cargoSel=b.dataset.c;sfx('ui');draw()};requestAnimationFrame(()=>paintCargoArt(b.querySelector('canvas'),b.dataset.c,+b.dataset.lv))});
@@ -1264,8 +1348,7 @@ function menu(){
     if($('cont'))$('cont').onclick=()=>{hide();continueGame()};
     if($('dsv'))$('dsv').onclick=e=>{const b=e.currentTarget;if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='Tap again to discard';return}clearGame();draw()};
     $('tgS').onclick=()=>{AU.on=!AU.on;auSave();updSnd();auInit();draw()};
-    $('tgV').onclick=()=>{AU.voice=!AU.voice;auSave();if(!AU.voice)hushVoice();draw()};
-    if($('tgVN'))$('tgVN').onclick=()=>{loadVoices();const top=VOICES.slice(0,8),i=top.indexOf(curVoice());const v=top[(i+1)%top.length];if(v){AU.vname=v.name;auSave();auInit();hushVoice();say('Mission control, radio check. How do you read?',true)}draw()};
+    $('mSet').onclick=()=>settingsScreen(menu);$('mHow').onclick=()=>howToScreen(menu);$('mCred').onclick=()=>creditsScreen(menu);$('mFb').onclick=()=>feedbackScreen(menu);
     document.querySelectorAll('.rk').forEach(b=>{b.onclick=()=>{setRocket(b.dataset.r);draw()};requestAnimationFrame(()=>drawPreview(b.querySelector('canvas'),ROCKETS[b.dataset.r]))});
     document.querySelectorAll('.slot').forEach(b=>b.onclick=()=>{const i=+b.dataset.s;hangar[i]=hangar[i]==='SL'?'VAC':'SL';draw()});
     $('start').onclick=()=>{hide();ship=newShip();S.clock=0;buildEngChips();checkpoint('launch')};
@@ -1276,7 +1359,7 @@ function menu(){
 
 function ago(t){const s=(Date.now()-t)/1000;return s<90?'just now':s<5400?Math.round(s/60)+' min ago':s<129600?Math.round(s/3600)+' h ago':Math.round(s/86400)+' days ago'}
 function releaseInputs(){for(const k in keys)keys[k]=false;document.querySelectorAll('#ctl .on,#mine .on,#zoom .on').forEach(b=>b.classList.remove('on'));if(mining)mining.digging=false}
-function show(html){releaseInputs();$('card').innerHTML=html;$('ov').hidden=false;document.body.classList.add('ovopen');S.paused=true}
+function show(html){releaseInputs();$('card').innerHTML=html;$('ov').hidden=false;$('ov').scrollTop=0;document.body.classList.add('ovopen');S.paused=true}
 function hide(){$('ov').hidden=true;document.body.classList.remove('ovopen')}
 // Card buttons fire on a clean tap even if the browser drops the click (seen on iOS after a held drive button)
 (()=>{const card=$('card');let down=null,fired=0;
@@ -1318,12 +1401,85 @@ function updSnd(){const b=$('snd');b.textContent=AU.on?'SOUND ON':'SOUND OFF';b.
 $('snd').addEventListener('click',()=>{AU.on=!AU.on;auSave();updSnd();auInit()});
 updSnd();
 $('tac').addEventListener('click',()=>setTac(!TAC));
-function pauseMenu(auto){
+/* ---------- menus: settings, how to play, credits, feedback ---------- */
+function setRow(id,label,val){return `<div class="setr"><label for="${id}">${label}</label><input type="range" id="${id}" min="0" max="100" step="5" value="${Math.round(val*100)}"><output id="${id}o">${Math.round(val*100)}%</output></div>`}
+function settingsScreen(back){
+  const draw=()=>{
+    show(`<div class="eyebrow">Settings</div><h2>Settings</h2>
+    <div class="setg">
+      <div class="setr"><label>Sound</label><button class="tg" id="sOn" aria-pressed="${AU.on}">${AU.on?'On':'Off'}</button></div>
+      ${setRow('vMus','Music',AU.vol.music)}
+      ${setRow('vSfx','Effects',AU.vol.sfx)}
+      ${setRow('vVoi','Voice',AU.vol.voice)}
+      <div class="setr"><label>Callouts</label><button class="tg" id="sVo" aria-pressed="${AU.voice}">${AU.voice?'Spoken':'Text only'}</button></div>
+      ${'speechSynthesis' in window?`<div class="setr"><label>Voice</label><button class="tg" id="sVn" ${VOICES.length>1?'':'disabled'}>${voiceLabel()} ▸</button><button class="tg" id="sVt">Test</button></div>`:''}
+      <div class="setr"><label>Tactical HUD</label><button class="tg" id="sTac" aria-pressed="${TAC}">${TAC?'On':'Off'}</button></div>
+    </div>
+    <p class="keys">For the most natural voice use Edge, or on iPhone download an Enhanced voice in Settings › Accessibility › Spoken Content › Voices.</p>
+    <div class="btns"><button class="btn" id="bk">Back</button></div>`);
+    const hook=(id,k)=>{const r=$(id);r.oninput=()=>{AU.vol[k]=r.value/100;$(id+'o').textContent=r.value+'%';auSave();if(k==='sfx')sfx('beep')};r.onchange=()=>{if(k==='voice'){hushVoice();say('Radio check.',true)}}};
+    hook('vMus','music');hook('vSfx','sfx');hook('vVoi','voice');
+    $('sOn').onclick=()=>{AU.on=!AU.on;auSave();updSnd();auInit();draw()};
+    $('sVo').onclick=()=>{AU.voice=!AU.voice;auSave();if(!AU.voice)hushVoice();draw()};
+    if($('sVn'))$('sVn').onclick=()=>{loadVoices();const top=VOICES.slice(0,8),i=top.indexOf(curVoice());const v=top[(i+1)%top.length];if(v){AU.vname=v.name;auSave();auInit();hushVoice();say('Mission control, radio check. How do you read?',true)}draw()};
+    if($('sVt'))$('sVt').onclick=()=>{auInit();hushVoice();if(!AU.voice||!AU.on)toast('Turn sound and spoken callouts on first','var(--warn)');else say('Mission control, radio check. How do you read?',true)};
+    $('sTac').onclick=()=>{setTac(!TAC);draw()};
+    $('bk').onclick=back;
+  };
+  draw();
+}
+function howToScreen(back){
+  show(`<div class="eyebrow">How to play</div><h2>How to play</h2>
+  <div class="howg">
+    <div><h4>The trip</h4><p>Launch from Port Meridian, park in orbit, burn for Mars, land at Jezero, make fuel from ice, fly home and land back at Port Meridian. Every landing grows the base.</p></div>
+    <div><h4>Flying</h4><p><b>◀ ▶</b> or <b>← →</b> rotate · hold <b>▲</b>, <b>↑</b> or <b>Space</b> to thrust · <b>E</b> swaps sea-level and vacuum engines · <b>S</b> stages · <b>P</b> chute · <b>+ −</b> zoom. Sea-level engines in air, vacuum engines in space. Watch the heat.</p></div>
+    <div><h4>Orbit</h4><p>Line up on the marker and burn when the countdown hits zero. In orbit, <b>M</b> mines passing asteroids for extra fuel.</p></div>
+    <div><h4>Landing</h4><p>Kill your sideways speed first, keep the nose up, and slow down to a gentle touch on the pad. The HUD shows your speed and the pad.</p></div>
+    <div><h4>On Mars</h4><p><b>Deploy rover</b>, drive to <b>ICE</b> or <b>hematite</b> and hold <b>Dig</b>. Bring it back up the ramp and <b>Stow</b> it, and the refinery turns ice into fuel and hematite into repair kits. Get inside before a dust storm.</p></div>
+    <div><h4>On foot</h4><p>Tap <b>EVA</b> at the ship, or <b>Exit rover</b> wherever you've stopped. Hold <b>Cut</b> to dig, tap <b>Aim</b> to change direction, and brace wide tunnels before they cave in. Watch your suit's O₂, and climb back into the rover or the ship to unload.</p></div>
+    <div><h4>The colony</h4><p>Each trip brings a new building. Your crew pick their own jobs. Use <b>Crew</b> to set the colony's priority.</p></div>
+  </div>
+  <div class="btns"><button class="btn" id="bk">Back</button></div>`);
+  $('bk').onclick=back;
+}
+function creditsScreen(back){
+  show(`<div class="eyebrow">Credits</div><h2>Mars Round Trip</h2>
+  <div class="credg">
+    <div><small>Created &amp; directed by</small><b>Danny</b></div>
+    <div><small>Built with</small><b>Claude by Anthropic</b></div>
+    <div><small>Music &amp; sound</small><b>Generated live in your browser. No samples, no recordings.</b></div>
+    <div><small>Voice</small><b>Your device's built-in speech voices</b></div>
+    <div><small>Typefaces</small><b>Barlow by Jeremy Tribby · IBM Plex Mono by IBM</b><span>Both under the SIL Open Font License</span></div>
+    <div><small>Inspired by</small><b>Real crewed Mars mission concepts, NASA's Perseverance rover and the Jezero crater</b></div>
+  </div>
+  <p class="keys">A fan-made game. Not affiliated with or endorsed by SpaceX, NASA or any space agency. All rocket, rover and company names are fictional.</p>
+  <div class="btns"><button class="btn" id="bk">Back</button></div>`);
+  $('bk').onclick=back;
+}
+function feedbackScreen(back){
+  show(`<div class="eyebrow">Feedback</div><h2>Tell us what you think</h2>
+  <p>Found a bug, got stuck, or have an idea? It goes straight to the developer.</p>
+  <div class="fbg"><textarea id="fbM" rows="5" maxlength="2000" placeholder="What happened, or what would make it better?"></textarea>
+  <input id="fbC" maxlength="120" placeholder="Reddit username or email (optional, if you'd like a reply)"></div>
+  <div class="btns"><button class="btn" id="fbS">Send</button><button class="btn ghost" id="bk">Back</button></div>`);
+  $('bk').onclick=back;
+  $('fbS').onclick=async()=>{
+    const msg=$('fbM').value.trim();if(msg.length<3){$('fbM').focus();return}
+    const b=$('fbS');b.disabled=true;b.textContent='Sending…';
+    const body=new URLSearchParams({'form-name':'feedback',bot:'',message:msg,contact:$('fbC').value.trim(),
+      context:`${S.cpPhase||S.phase} · landings ${colony.landings||0} · ${innerWidth}×${innerHeight} · ${navigator.userAgent.slice(0,160)}`});
+    let ok=false;try{const r=await fetch('/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()});ok=r.ok}catch(e){}
+    if(ok){show(`<div class="eyebrow">Feedback</div><h2>Thanks!</h2><p>Got it. Every message gets read.</p><div class="btns"><button class="btn" id="bk">Back</button></div>`);$('bk').onclick=back}
+    else{b.disabled=false;b.textContent='Send';toast('Couldn’t send from here. The form works on the live site.','var(--warn)')}
+  };
+}
+function pauseMenu(auto,wp){
   if(S.phase==='menu'||!S.cpPhase||!$('ov').hidden)return;
-  const wasPaused=S.paused;for(const k in keys)keys[k]=false;hushVoice();
+  const wasPaused=wp??S.paused;for(const k in keys)keys[k]=false;hushVoice();
   if(auto){show(`<div class="eyebrow">Paused · ${PHASES[S.cpPhase].title}</div><h2>Paused</h2><p>The game paused while you were away.</p><div class="btns"><button class="btn" id="pzR">Resume</button><button class="btn ghost" id="pzS">Restart stage</button><button class="btn ghost" id="pzN">New mission</button></div>`)}
-  else show(`<div class="eyebrow">Paused · ${PHASES[S.cpPhase].title}</div><h2>Restart?</h2><p>Restarting the stage puts you back where ${PHASES[S.cpPhase].title.toLowerCase()} began, with the ship as it was then. A new mission goes back to rocket selection. Jezero Base keeps everything you've built.</p>
-    <div class="btns"><button class="btn" id="pzS">Restart stage</button><button class="btn ghost" id="pzN">New mission</button><button class="btn ghost" id="pzR">Resume</button></div>`);
+  else show(`<div class="eyebrow">Paused · ${PHASES[S.cpPhase].title}</div><h2>Paused</h2><p>Restart stage puts you back where ${PHASES[S.cpPhase].title.toLowerCase()} began, with the ship as it was then. Exit to menu keeps your saved progress, and Jezero Base keeps everything you've built.</p>
+    <div class="btns pzb"><button class="btn" id="pzR">Resume</button><button class="btn ghost" id="pzS">Restart stage</button><button class="btn ghost" id="pzT">Settings</button><button class="btn ghost" id="pzN">Exit to menu</button></div>`);
+  if($('pzT'))$('pzT').onclick=()=>settingsScreen(()=>{hide();pauseMenu(false,wasPaused)});
   $('pzS').onclick=()=>{hide();resetRun();retry()};
   $('pzN').onclick=()=>{hide();resetRun();menu()};
   $('pzR').onclick=()=>{hide();S.paused=wasPaused};
@@ -1352,6 +1508,8 @@ function crewSheet(){
 $('crewB').addEventListener('click',crewSheet);
 const KMAP={KeyM:'mine',Equal:'zin',NumpadAdd:'zin',Minus:'zout',NumpadSubtract:'zout',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'thrust',KeyW:'thrust',Space:'thrust'};
 addEventListener('keydown',e=>{
+  if(/^(INPUT|TEXTAREA)$/.test(e.target.tagName||'')){if(e.code==='Escape'&&$('bk'))$('bk').click();return}
+  if(!$('ov').hidden&&$('bk')&&e.code==='Escape'){e.preventDefault();$('bk').click();return}
   if(!$('ov').hidden&&$('pzR')){if(e.code==='Escape'){e.preventDefault();$('pzR').click()}return}
   if(!$('ov').hidden){if(e.code==='Enter'||e.code==='Space'){const b=$('card').querySelector('.btn');if(b){e.preventDefault();b.click()}}return}
   if(KMAP[e.code]){e.preventDefault();if(mining&&S.phase==='mining'&&KMAP[e.code]==='thrust'){if(mining.act.k==='dig'||mining.act.k==='cut')mining.digging=true;else if(!e.repeat)roverDo(mining.act);return}keys[KMAP[e.code]]=true}
@@ -2176,6 +2334,7 @@ function roverDo(a){
   }
   else if(a.k==='unload')unload();
   else if(a.k==='board')endEva();
+  else if(a.k==='enterRover')enterRover();
   else if(a.k==='brace')placeBrace();
   else if(a.k==='shield'){colony.shields=colony.shields||[];colony.shields.push({x:Math.round(m.bg.x),lv:1});ship.kits-=2;colSave();toast('Dust shield up · moderate storms are workable here','var(--ok)');sfx('servo');callout('Windbreak panels deployed and anchored. That zone will hold through a moderate storm. Not a severe one.')}
   else if(a.k==='shieldUp'){const sh=(colony.shields||[]).find(q=>Math.abs(q.x-m.bg.x)<SHIELD_W[q.lv]/2);if(sh){sh.lv=2;ship.kits-=3;colSave();toast('Shield upgraded · enclosure and electrostatic curtain','var(--ok)');sfx('servo')}}
@@ -2204,7 +2363,7 @@ function stepRover(dt){
     else if(!b.lane&&m.ramp>.98&&!m.rampDir&&b.x>r.ex-1&&b.x<r.ex+5&&b.vx<.3&&b.y<r.g+4)b.lane=true; // at the ramp foot heading in: drive up
     rampLane=!!b.lane} // off the ramp foot: free to drive past the ship
   const ca=Math.cos(b.ang),sa=Math.sin(b.ang),rx=ca,ry=sa,ux=-sa,uy=ca;
-  const thr=((keys.right?1:0)-(keys.left?1:0))*(m.slow>0?.35:1)*(m.stormOn?.55:1)*(m.bat<=0?.3:1)*(1+.15*colN('garage'));
+  const thr=(m.eva?0:(keys.right?1:0)-(keys.left?1:0))*(m.slow>0?.35:1)*(m.stormOn?.55:1)*(m.bat<=0?.3:1)*(1+.15*colN('garage'));
   let fx=0,fy=-g*BG.mc,tq=0,any=false;
   for(let i=0;i<2;i++){
     const off=i?BG.L:-BG.L,w=b.w[i];
@@ -2254,7 +2413,7 @@ function stepSurface(dt){
   if(m.rover==='out'&&m.bg){
     const b=m.bg;
     for(let i=0;i<6;i++)stepRover(dt/6);
-    const th=keys.left||keys.right;
+    const th=!m.eva&&(keys.left||keys.right);
     m.bat=clamp(m.bat-(th?.5:.04)*dt*(m.stormOn?1.6:1),0,100);
     if(colN('solar')&&Math.abs(b.x-modX('solar'))<45)m.bat=Math.min(100,m.bat+2.2*colN('solar')*dt);
     if(m.bat<=0&&!m.flatT){m.flatT=1;toast('Rover battery flat — crawling on reserve','var(--bad)')}
@@ -2703,13 +2862,13 @@ function drawScout(t){
 const MAT=[
   null,
   {id:'reg',name:'Regolith',col:'#7a3d24',hard:.22,e:.12,bag:.25},
-  {id:'perc',name:'Perchlorate soil',col:'#9a5432',hard:.25,e:.12,bag:.5},
+  {id:'perc',name:'Perchlorate soil',col:'#9a5432',hard:.25,e:.12,bag:.5,soon:'oxygen extraction'},
   {id:'bas',name:'Basalt',col:'#4c2c22',hard:.85,e:.45,bag:.5},
   {id:'ice',name:'Water ice',col:'#cfe9f5',hard:.5,e:.3,bag:1},
   {id:'hem',name:'Hematite',col:'#8e3b2c',hard:.8,e:.4,bag:1,spot:'#c8604a'},
-  {id:'sulf',name:'Sulfates',col:'#c9b064',hard:.45,e:.25,bag:1},
-  {id:'sil',name:'Silica',col:'#d8d2c4',hard:1,e:.55,bag:1},
-  {id:'alu',name:'Aluminium clay',col:'#a08a78',hard:.4,e:.22,bag:1},
+  {id:'sulf',name:'Sulfates',col:'#c9b064',hard:.45,e:.25,bag:1,soon:'fertiliser'},
+  {id:'sil',name:'Silica',col:'#d8d2c4',hard:1,e:.55,bag:1,soon:'glass'},
+  {id:'alu',name:'Aluminium clay',col:'#a08a78',hard:.4,e:.22,bag:1,soon:'ceramics'},
   {id:'bed',name:'Bedrock',col:'#2f1d18',hard:4.5,e:2,bag:.25,mk:2},
   {id:'brace',name:'Brace',col:'#9aa2a8',hard:1e9,e:0,bag:0}
 ];
@@ -2776,12 +2935,26 @@ function drawShield(s,t){
 const AIMS=[[1,.45],[1,0],[1,-.6],[.001,-1]]; // ↗ → ↘ ↓
 const AIM_LABEL=['AIM ↗','AIM →','AIM ↘','AIM ↓'];
 const BAG_CAP=24;
+const canExitRover=m=>m&&m.rover==='out'&&m.bg&&!m.bg.lane&&Math.hypot(m.bg.vx,m.bg.vy)<.6;
 function startEva(){
-  const m=mining;if(!m||m.eva||m.rover!=='stowed'||m.rampDir)return;
-  if(m.stormOn&&stormFactor(m.shipX-6)>.5){toast('Not in this storm','var(--warn)');return}
-  subGen();const x=m.shipX-6.2;
-  m.eva={x,y:surfY(x)+.05,vx:0,vy:0,dir:-1,aim:2,o2:100,bat:100,bag:{},bagN:0,ground:true,walk:0,cutT:0,mk:(colony.research||0)>=10?2:1};
-  sfx('servo');callout(`EVA started. Suit pressure good. Cutter Mk${m.eva.mk} charged.`);
+  const m=mining;if(!m||m.eva)return;
+  const fromRover=canExitRover(m);
+  if(!fromRover&&(m.rover!=='stowed'||m.rampDir)){if(m.rover==='out')toast('Stop the rover to climb out','var(--warn)');return}
+  const x0=fromRover?m.bg.x+(m.bg.x>m.shipX?-3.2:3.2):m.shipX-6.2;
+  if(m.stormOn&&stormFactor(x0)>.5){toast('Not in this storm','var(--warn)');return}
+  subGen();
+  // stepping out of the rover: it recharges the suit and cutter from its own battery
+  if(fromRover)m.bat=Math.max(0,m.bat-4);
+  m.eva={x:x0,y:surfY(x0)+.05,vx:0,vy:0,dir:fromRover?(m.bg.x>m.shipX?-1:1):-1,aim:2,o2:100,bat:fromRover?Math.min(100,40+m.bat):100,bag:{},bagN:0,ground:true,walk:0,cutT:0,mk:(colony.research||0)>=10?2:1,fromRover};
+  sfx('servo');callout(fromRover?`Out of the rover. Suit topped up from rover power. Cutter Mk${m.eva.mk} charged.`:`EVA started. Suit pressure good. Cutter Mk${m.eva.mk} charged.`);
+}
+// climbing back into the rover: ice and hematite go in its hopper, other finds into the sample locker
+function enterRover(){const m=mining,e=m.eva;if(!e||!m.bg)return;
+  const c=m.bg.cargo,got=[];
+  for(const [k,v] of Object.entries(e.bag)){if(v<.5)continue;
+    if(k==='ice'){c.ice+=v*.55;got.push(`${v.toFixed(0)} ice`)}else if(k==='hem'){c.iron+=v*.7;got.push(`${v.toFixed(0)} hematite`)}
+    else{colony.mat=colony.mat||{};colony.mat[k]=(colony.mat[k]||0)+v;const mm=MAT.find(q=>q&&q.id===k);got.push(`${v.toFixed(0)} ${mm?mm.n||mm.name:k}`)}}
+  m.eva=null;subSave();colSave();toast(got.length?`Stowed in rover: ${got.join(', ')}`:'Back in the rover','var(--ok)');sfx('clunk');
 }
 function endEva(){const m=mining,e=m.eva;if(!e)return;
   const got=[];for(const [k,v] of Object.entries(e.bag)){if(v<.5)continue;if(k==='ice'){m.ref.ice+=v*.55;got.push(`${v.toFixed(0)} ice`)}else if(k==='hem'){m.ref.iron+=v*.7;got.push(`${v.toFixed(0)} hematite`)}else{colony.mat=colony.mat||{};colony.mat[k]=(colony.mat[k]||0)+v;got.push(`${v.toFixed(0)} ${MAT.find(q=>q&&q.id===k).name.toLowerCase()}`)}}
@@ -2790,6 +2963,8 @@ function endEva(){const m=mining,e=m.eva;if(!e)return;
 const evaDepth=e=>surfY(e.x)-(e.y+1);
 function evaAction(){
   const m=mining,e=m.eva,nearShip=Math.abs(e.x-(m.shipX-6.2))<3&&evaDepth(e)<.5;
+  const nearRover=m.rover==='out'&&m.bg&&Math.abs(e.x-m.bg.x)<3.6&&evaDepth(e)<.6;
+  if(nearRover&&!(m.creak&&Math.abs(m.creak.x-e.x)<8&&(e.bag.bas||0)+(e.bag.reg||0)>=2))return{k:'enterRover',label:e.bagN?'Enter rover · stow':'Enter rover'};
   if(m.creak&&Math.abs(m.creak.x-e.x)<8&&(e.bag.bas||0)+(e.bag.reg||0)>=2)return{k:'brace',label:'Place brace'};
   if(nearShip)return{k:'board',label:e.bagN?'Board · unload':'Board ship'};
   if(e.bat<=0)return{k:'none',label:'Cutter flat'};
@@ -2815,7 +2990,7 @@ function stepEva(dt){
   // life support: oxygen always drains; storms are worse on the surface and shields only stop dust, not the clock
   const sf=inside?0:stormFactor(e.x);
   e.o2=Math.max(0,e.o2-(.18+sf*.8)*dt);
-  if(e.o2<20&&!e.warn){e.warn=1;toast('Suit O₂ low · get back to the ship','var(--bad)');sfx('alarm')}
+  if(e.o2<20&&!e.warn){e.warn=1;toast(m.rover==='out'?'Suit O₂ low · get back to the rover':'Suit O₂ low · get back to the ship','var(--bad)');sfx('alarm')}
   if(e.o2<=0){m.eva=null;fail({t:'Out of oxygen on EVA',d:'The suit ran dry. Keep an eye on O₂ and head back to the ship elevator with a margin. Being underground keeps the dust off, but not the clock.'});return}
   // the cutter
   m.act=evaAction();
@@ -2842,7 +3017,7 @@ function cutCell(px,py,amt,mat,e){
   SUB.dmg.delete(q);SUB.g[q]=0;SUB.vis[q]=1;SUB.dug.add(q);SUB.colVis[i]=1;
   e.bat=Math.max(0,e.bat-mat.e);const add=Math.min(mat.bag,Math.max(0,BAG_CAP-e.bagN));if(add>0)e.bag[mat.id]=(e.bag[mat.id]||0)+add; // spoil is left behind once the bag is full
   e.bagN=Object.values(e.bag).reduce((a,b)=>a+b,0);
-  if(!e.seen)e.seen={};if(!e.seen[mat.id]&&mat.id!=='reg'&&mat.id!=='bas'){e.seen[mat.id]=1;toast(`${mat.name} · sample bagged`,'var(--cool)');if(mat.id==='perc')callout('Careful with that one. Perchlorates are toxic. Bag it sealed, it needs treating before anyone uses it.')}
+  if(!e.seen)e.seen={};if(!e.seen[mat.id]&&mat.id!=='reg'&&mat.id!=='bas'){e.seen[mat.id]=1;toast(mat.soon?`${mat.name} · bagged · ${mat.soon} coming soon`:`${mat.name} · sample bagged`,'var(--cool)');if(mat.id==='perc')callout('Careful with that one. Perchlorates are toxic. Bag it sealed, it needs treating before anyone uses it.')}
   revealAround(q,true);
   checkSpan(i,j);
 }
@@ -2907,12 +3082,14 @@ function drawEvaDark(z){
 }
 function drawEvaHud(){
   const m=mining,e=m&&m.eva;if(!e)return;ctx.setTransform(DPR,0,0,DPR,0,0);
-  const x=12,y=82,w=Math.min(220,W*.58);ctx.fillStyle='rgba(6,10,15,.62)';ctx.fillRect(x,y,w,96);ctx.fillStyle='#f0f0fa';ctx.fillRect(x,y,2,96);
+  const soon=Object.entries(e.bag).some(([k,v])=>v>=.5&&MAT.find(q=>q&&q.id===k).soon),H=soon?108:96;
+  const x=12,y=82,w=Math.min(220,W*.58);ctx.fillStyle='rgba(6,10,15,.62)';ctx.fillRect(x,y,w,H);ctx.fillStyle='#f0f0fa';ctx.fillRect(x,y,2,H);
   ctx.font='700 11px "Barlow",sans-serif';ctx.textAlign='left';ctx.fillStyle='#f0f0fa';ctx.fillText(`EVA · CUTTER MK${e.mk} · ${Math.max(0,evaDepth(e)).toFixed(1)} M DEEP`,x+10,y+15);
   const bar=(yy,lab,v,col)=>{ctx.font='600 10px "Barlow",sans-serif';ctx.fillStyle='rgba(240,240,250,.6)';ctx.fillText(lab,x+10,yy);ctx.fillStyle='rgba(240,240,250,.15)';ctx.fillRect(x+70,yy-7,w-82,5);ctx.fillStyle=col;ctx.fillRect(x+70,yy-7,(w-82)*clamp(v,0,1),5)};
   bar(y+33,'SUIT O₂',e.o2/100,e.o2<25?'#ff4b4b':'#69d3ff');bar(y+48,'CUTTER',e.bat/100,'#ffc23d');bar(y+63,'SAMPLE BAG',e.bagN/BAG_CAP,'#62de88');
-  const items=Object.entries(e.bag).filter(([,v])=>v>=.5).map(([k,v])=>`${MAT.find(q=>q&&q.id===k).name} ${v.toFixed(0)}`).join(' · ');
+  const items=Object.entries(e.bag).filter(([,v])=>v>=.5).map(([k,v])=>{const q=MAT.find(q=>q&&q.id===k);return `${q.name} ${v.toFixed(0)}${q.soon?'*':''}`}).join(' · ');
   ctx.font='500 9.5px "Barlow",sans-serif';ctx.fillStyle='rgba(240,240,250,.7)';ctx.fillText(items||'Bag empty',x+10,y+84,w-18);
+  if(soon){ctx.fillStyle='rgba(105,211,255,.75)';ctx.fillText('* stored at base · processing coming soon',x+10,y+98,w-18)}
 }
 
 const colPop=()=>colony.settlers?colony.settlers.length:0;
@@ -3665,7 +3842,7 @@ function tipTriggers(){
   else if(P==='leo'&&leo){if(!leo.win.open)tip('o_wait','Waiting for the window · park beside a rock and hold MINE');else tip('o_burn','Window open · point at PROGRADE ▸ and hold THRUST')}
   else if((P==='toMars'||P==='toEarth')&&tr&&tr.state==='wait')tip('t_burn','Tap BURN when the planet is inside the green arc');
   else if(P==='marsLand'){tip('m_land','Kill your sideways speed early · land on flat ground under 5 m/s');if(alt<450)tip('m_burn','Follow the landing-burn cue under the ship')}
-  else if(P==='mining'&&mining){const m=mining;if(m.rover==='stowed'&&!m.eva&&(ship.fuel<homeNeed()||!TIPS_SEEN.s_dep))tip('s_dep','Tap DEPLOY ROVER to drive out for ice');if(m.rover==='out'&&m.bg){tip('s_ice','Drive to ICE and hold DIG');if(m.bg.cargo.ice+m.bg.cargo.iron>5)tip('s_back','Back at the ship: Open ramp, drive up it, then STOW')}if(m.storm<32&&!m.stormOn)tip('s_storm','Storm coming · get the rover inside the ship or a shelter');if(TIPS_SEEN.s_back&&m.rover==='stowed')tip('s_eva','New: tap EVA to explore on foot with the cutter');if(m.eva){tip('e_cut','Hold CUT to dig · tap AIM to change direction');if(evaDepth(m.eva)>3)tip('e_out','To climb out, hold a direction into the shaft wall')}}
+  else if(P==='mining'&&mining){const m=mining;if(m.rover==='stowed'&&!m.eva&&(ship.fuel<homeNeed()||!TIPS_SEEN.s_dep))tip('s_dep','Tap DEPLOY ROVER to drive out for ice');if(m.rover==='out'&&m.bg){tip('s_ice','Drive to ICE and hold DIG');if(m.bg.cargo.ice+m.bg.cargo.iron>5)tip('s_back','Back at the ship: Open ramp, drive up it, then STOW');if(TIPS_SEEN.s_ice&&canExitRover(m)&&!m.eva)tip('s_exit','New: tap EXIT ROVER to climb out and dig on foot')}if(m.storm<32&&!m.stormOn)tip('s_storm','Storm coming · get the rover inside the ship or a shelter');if(TIPS_SEEN.s_back&&m.rover==='stowed')tip('s_eva','New: tap EVA to explore on foot with the cutter');if(m.eva){tip('e_cut','Hold CUT to dig · tap AIM to change direction');if(evaDepth(m.eva)>3)tip('e_out','To climb out, hold a direction into the shaft wall')}}
   else if(P==='marsAscent')tip('a_up','Climb and tip right · 1,000 m up and 110 m/s sideways');
   else if(P==='reentry'){if(alt>600)tip('r_belly','Keep the ship flat, belly to the wind, to bleed off speed');else tip('r_flip','Flip upright and burn · head for the tower')}
 }
@@ -3749,11 +3926,11 @@ function hud(){
     const a=mn.act,bd=$('bDo');if(bd.textContent!==a.label)bd.textContent=a.label;bd.disabled=a.k==='none';if(bd.disabled)bd.classList.remove('on');
     const home=roverHome(),bl=$('bLaunch');bl.disabled=!home||mn.stormOn;bl.textContent=home&&mn.stormOn?'Storm':home?'Launch':'Rover out';
     document.querySelectorAll('#mine .arrow').forEach(x=>x.disabled=!out&&!mn.eva);
-    const be=$('bEva');be.textContent=mn.eva?AIM_LABEL[mn.eva.aim]:'EVA';be.disabled=!mn.eva&&(mn.rover!=='stowed'||!!mn.rampDir);
+    const be=$('bEva'),rvEx=canExitRover(mn);be.textContent=mn.eva?AIM_LABEL[mn.eva.aim]:mn.rover==='out'?'Exit rover':'EVA';be.disabled=!mn.eva&&!rvEx&&(mn.rover!=='stowed'||!!mn.rampDir);
     if(mn.eva){bl.disabled=true;bl.textContent='On EVA'}
     const px=out?b.x:body.x,dirTxt=x=>x>px?'▸':'◂',dist=x=>Math.round(Math.abs(x-px));
     const nearest=type=>{let best=null,bdd=1e9;for(const d of mn.deps)if(d.type===type&&d.left>.05){const dd=Math.abs(d.x-px);if(dd<bdd){bdd=dd;best=d}}return best};
-    if(mn.eva){const e=mn.eva,dep=Math.max(0,evaDepth(e));o=mn.creak?'Rock creaking! Brace it or get clear':e.o2<25?'O₂ low · back to the ship elevator':e.bagN>=BAG_CAP?'Bag full · back to the ship to unload':mn.stormOn&&dep<2?'Storm · get underground or back aboard':dep>2?`Underground · ${dep.toFixed(0)} m · hold CUT, tap AIM to change direction`:'EVA · hold CUT to dig · tap AIM to change direction'}
+    if(mn.eva){const e=mn.eva,dep=Math.max(0,evaDepth(e));o=mn.creak?'Rock creaking! Brace it or get clear':e.o2<25?(mn.rover==='out'?'O₂ low · back to the rover or ship':'O₂ low · back to the ship elevator'):e.bagN>=BAG_CAP?(mn.rover==='out'?'Bag full · stow it in the rover or ship':'Bag full · back to the ship to unload'):mn.stormOn&&dep<2?'Storm · get underground or back aboard':dep>2?`Underground · ${dep.toFixed(0)} m · hold CUT, tap AIM to change direction`:'EVA · hold CUT to dig · tap AIM to change direction'}
     else if(mn.stormOn)o=out?(stormFactor(b.x)<.3?'Sheltered by the dust shield · keep working':'Get to shelter! The ship ramp or a base building'):'Sheltering · waiting out the storm';
     else if(mn.rover==='stowed')o=ship.fuel<need?'Deploy the rover to fetch ice':'Fuel is good. Launch, or explore for samples';
     else if(mn.rover==='shelter')o='Sheltered and charging. Drive out when ready';
