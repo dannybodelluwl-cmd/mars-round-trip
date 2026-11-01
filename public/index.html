@@ -195,11 +195,27 @@ body.badge.surface #capcom{bottom:calc(234px + env(safe-area-inset-bottom,0px))}
 .lbr.me{background:rgba(255,194,61,.12);outline:1px solid rgba(255,194,61,.45)}.lbr.gap{background:none;text-align:center;display:block;color:rgba(240,240,250,.4)}
 .lbr:nth-child(1) i{color:#ffd76a}.lbr:nth-child(2) i{color:#d9e2ea}.lbr:nth-child(3) i{color:#e0a272}
 .lbnote{font-size:13px;color:rgba(240,240,250,.65)}.lbnote.bad{color:var(--warn)}
- #lbSide{position:absolute;z-index:41;right:max(40px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);width:min(380px,30vw);max-height:84vh;overflow:auto;display:grid;gap:12px;align-content:start;
-  padding:22px;border:1px solid rgba(240,240,250,.16);border-radius:12px;background:rgba(6,9,13,.72);backdrop-filter:blur(8px);font-family:var(--din);color:var(--sw)}
-#lbSide h3{margin:0;font-weight:700;font-size:28px;letter-spacing:.03em;text-transform:uppercase;color:#fff}
-#lbSide .lbl{max-height:none}#lbSide .lbmore{justify-self:start;font-size:12px;padding:8px 14px}
-@media (max-width:1099px),(max-height:560px){#lbSide{display:none!important}}
+ #lbSide{position:absolute;z-index:41;right:max(64px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);box-sizing:border-box;width:min(clamp(420px,38vw,640px),calc(100vw - 700px));max-height:88vh;overflow:auto;display:grid;gap:22px;align-content:start;
+  padding:34px 36px 30px;border:0;border-top:1px solid rgba(240,240,250,.9);background:linear-gradient(180deg,rgba(0,0,0,.82),rgba(0,0,0,.62));backdrop-filter:blur(6px);font-family:var(--din);color:var(--sw)}
+#lbSide .lbs-top{display:flex;justify-content:space-between;font-size:12px;font-weight:700;letter-spacing:.32em;text-transform:uppercase;color:rgba(240,240,250,.7)}
+#lbSide .lbs-top span:last-child{display:flex;align-items:center;gap:8px}#lbSide .lbs-top span:last-child::before{content:"";width:7px;height:7px;border-radius:50%;background:#f0f0fa;animation:lbpulse 2s infinite}
+@keyframes lbpulse{50%{opacity:.25}}
+#lbSide h3{margin:0;font-weight:700;font-size:clamp(46px,5.2vw,84px);line-height:.9;letter-spacing:.02em;text-transform:uppercase;color:#fff}
+#lbSide .lbs-tabs{display:flex;gap:28px;border-bottom:1px solid rgba(240,240,250,.18)}
+#lbSide .lbs-tabs button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:0 0 12px;color:rgba(240,240,250,.5);font:700 13px var(--din);letter-spacing:.24em;text-transform:uppercase;cursor:pointer}
+#lbSide .lbs-tabs button[aria-pressed="true"]{color:#fff;border-color:#fff}#lbSide .lbs-tabs button:hover{color:#fff}
+#lbSide .lbl{max-height:none;gap:0}
+#lbSide .lbr{grid-template-columns:54px minmax(0,1fr) auto;column-gap:14px;padding:14px 4px;border-radius:0;background:none;border-bottom:1px solid rgba(240,240,250,.12)}
+#lbSide .lbr i{font-family:var(--din);font-size:22px;font-weight:700;color:rgba(240,240,250,.4);letter-spacing:.04em}
+#lbSide .lbr:nth-child(-n+3) i{color:#fff}
+#lbSide .lbr b{font-size:19px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#fff}
+#lbSide .lbr span{font-size:12px;letter-spacing:.06em;color:rgba(240,240,250,.5);margin-top:3px}
+#lbSide .lbr em{font-family:var(--din);font-size:26px;font-weight:700;letter-spacing:.02em;color:#fff}
+#lbSide .lbr.me{outline:none;background:rgba(240,240,250,.08);box-shadow:inset 3px 0 0 #fff}
+#lbSide .lbnote{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:rgba(240,240,250,.55);padding-top:12px}
+#lbSide .lbs-more{justify-self:start;background:none;border:1px solid rgba(240,240,250,.6);border-radius:32px;padding:14px 26px;color:#fff;font:700 13px var(--din);letter-spacing:.24em;text-transform:uppercase;cursor:pointer;transition:background .2s,color .2s}
+#lbSide .lbs-more:hover{background:#fff;color:#000}
+@media (max-width:1099px),(max-height:600px){#lbSide{display:none!important}}
 .lbact,.lbtabs{display:flex;gap:8px;flex-wrap:wrap}.lbtabs .tg{font-size:12px;padding:8px 14px}
 .tg{border:1px solid #3a4654;background:transparent;border-radius:6px;font-size:11px;padding:6px 10px;color:var(--fg)}
 .tg[aria-pressed="false"]{color:var(--dim)}
@@ -1473,9 +1489,10 @@ let lbSideBoard='school';const lbCache={};
 function lbSideOff(){const el=$('lbSide');if(el)el.hidden=true}
 async function lbSideOn(){
   const el=$('lbSide');if(!el)return;el.hidden=false;const b=lbSideBoard;
-  const head=`<div class="eyebrow">World leaderboard</div><h3>Top pilots</h3>
-    <div class="lbtabs"><button class="tg" data-b="school" aria-pressed="${b==='school'}">Flight School</button><button class="tg" data-b="mission" aria-pressed="${b==='mission'}">Mars Round Trip</button></div>`;
-  const paint=(body)=>{if(el.hidden||lbSideBoard!==b)return;el.innerHTML=head+`<div class="lbl">${body}</div><button class="tg lbmore" id="lbSideAll">Full leaderboard</button>`;
+  const head=`<div class="lbs-top"><span>World leaderboard</span><span>Live</span></div><h3>Top<br>Pilots</h3>
+    <div class="lbs-tabs"><button data-b="school" aria-pressed="${b==='school'}">Flight School</button><button data-b="mission" aria-pressed="${b==='mission'}">Mars Round Trip</button></div>`;
+  const pad=h=>h.replace(/<i>(\d)<\/i>/g,'<i>0$1</i>');
+  const paint=(body)=>{if(el.hidden||lbSideBoard!==b)return;el.innerHTML=head+`<div class="lbl">${pad(body)}</div><button class="lbs-more" id="lbSideAll">Full leaderboard <span>→</span></button>`;
     el.querySelectorAll('[data-b]').forEach(t=>t.onclick=()=>{lbSideBoard=t.dataset.b;lbSideOn()});$('lbSideAll').onclick=()=>leaderboardScreen(menu,b)};
   const c=lbCache[b];
   if(c&&Date.now()-c.t<60000){paint(c.html);return}
