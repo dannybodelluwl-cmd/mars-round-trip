@@ -182,6 +182,20 @@ body.badge.surface #capcom{bottom:calc(234px + env(safe-area-inset-bottom,0px))}
 .fbg textarea,.fbg input{width:100%;box-sizing:border-box;background:rgba(240,240,250,.06);border:1px solid rgba(240,240,250,.3);border-radius:8px;color:#f0f0fa;font:14px/1.4 "Barlow",sans-serif;padding:10px;resize:vertical}
 .fbg textarea:focus,.fbg input:focus{outline:none;border-color:#f0f0fa}
 .pzb .btn{flex:1 1 45%}
+.lbx{display:grid;gap:8px;border-top:1px solid rgba(240,240,250,.15);padding-top:12px}
+.lbh{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(240,240,250,.6)}
+.lbform{display:flex;gap:8px}.lbform input{flex:1;min-width:0;background:rgba(240,240,250,.06);border:1px solid rgba(240,240,250,.3);border-radius:8px;color:#f0f0fa;font:15px "Barlow",sans-serif;padding:9px 10px}
+.lbform input:focus{outline:none;border-color:#f0f0fa}.lbform .tg{font-size:12px;padding:8px 14px;white-space:nowrap}
+.lbrank{font-size:15px;color:rgba(240,240,250,.85)}.lbrank b{font-size:24px;color:#fff;margin-right:4px}
+.lbl{display:grid;gap:2px;max-height:52vh;overflow:auto}
+.lbr{display:grid;grid-template-columns:30px minmax(0,1fr) auto;column-gap:10px;align-items:baseline;padding:6px 8px;border-radius:6px;background:rgba(240,240,250,.04)}
+.lbr i{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:12px;color:rgba(240,240,250,.55)}
+.lbr b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lbr em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--warn);grid-row:1;grid-column:3}
+.lbr span{grid-column:2/4;font-size:11.5px;color:rgba(240,240,250,.55)}
+.lbr.me{background:rgba(255,194,61,.12);outline:1px solid rgba(255,194,61,.45)}.lbr.gap{background:none;text-align:center;display:block;color:rgba(240,240,250,.4)}
+.lbr:nth-child(1) i{color:#ffd76a}.lbr:nth-child(2) i{color:#d9e2ea}.lbr:nth-child(3) i{color:#e0a272}
+.lbnote{font-size:13px;color:rgba(240,240,250,.65)}.lbnote.bad{color:var(--warn)}
+.lbact,.lbtabs{display:flex;gap:8px;flex-wrap:wrap}.lbtabs .tg{font-size:12px;padding:8px 14px}
 .tg{border:1px solid #3a4654;background:transparent;border-radius:6px;font-size:11px;padding:6px 10px;color:var(--fg)}
 .tg[aria-pressed="false"]{color:var(--dim)}
 .tg[aria-pressed="true"]{border-color:var(--cool)}
@@ -1143,12 +1157,14 @@ function drawSchoolGuides(z){
 function schoolDone(caught){
   S.phase='won';try{localStorage.setItem('mrt.school','done')}catch(e){}
   const b=body,sc=S.school;sfx('chime');callout(caught?'Catch! Great flying. You are cleared for Mars.':'Touchdown on the mount. Good enough, pilot. You are cleared for Mars.');
+  const lbS={caught:!!caught,time:Math.round(S.clock),fuelUsed:Math.round(100-ship.fuel),maxAlt:Math.round(sc.maxAlt)},lbSc=LB_SCORE.school(lbS);
   setTimeout(()=>{show(`<div class="eyebrow">Flight school · passed</div><h2>${caught?'Caught by the tower':'Down on the mount'}</h2>
     <p>${caught?'That is exactly how Port Meridian brings its rockets home. Do that at the end of a Mars round trip and you are a legend.':'A good landing. Next time, try hovering between the arms for a tower catch.'}</p>
     <div class="stats"><div class="stat"><span>Max altitude</span><b>${fmt(sc.maxAlt)} m</b></div><div class="stat"><span>Flight time</span><b>${Math.floor(S.clock/60)}:${String(Math.floor(S.clock%60)).padStart(2,'0')}</b></div>
-    <div class="stat"><span>Fuel used</span><b>${Math.round(100-ship.fuel)}%</b></div><div class="stat"><span>Return</span><b>${caught?'Tower catch':'Mount landing'}</b></div></div>
+    <div class="stat"><span>Fuel used</span><b>${Math.round(100-ship.fuel)}%</b></div><div class="stat"><span>Return</span><b>${caught?'Tower catch':'Mount landing'}</b></div><div class="stat"><span>Score</span><b style="color:var(--warn)">${lbSc.toLocaleString()}</b></div></div>
+    <div class="lbx" id="lbx"></div>
     <div class="btns"><button class="btn" id="scGo">Start the Mars mission</button><button class="btn ghost" id="scAgain">Fly again</button></div>`);
-    $('scGo').onclick=()=>{hide();S.school=null;menu()};$('scAgain').onclick=()=>{hide();startSchool()}},1600);
+    rebindResults=()=>{$('scGo').onclick=()=>{hide();S.school=null;menu()};$('scAgain').onclick=()=>{hide();startSchool()};lbMount('school',lbS,lbSc)};rebindResults()},1600);
 }
 function startSchool(){setRocket(RK.id||'starship');ship=newShip();S.clock=0;S.school=null;buildEngChips();S.cp=clone(ship);S.cpPhase='school';briefing('school')}
 function orbit(next,msg){
@@ -1239,11 +1255,13 @@ function win(off,caught){
   let stars=1+(caught?2:off<20?1:0)+(ship.stats.lost===0?1:0)+(ship.fuel>8?1:0)+(time<420?1:0)+(colN('green')?1:0);
   const del=colony.mods.find(m=>m.mid===ship.mid);clearGame();if(ship.samples&&!ship.samplesBanked){ship.samplesBanked=1;colony.samples=(colony.samples||0)+ship.samples;colSave()}
   stars=clamp(stars,1,5);
+  const lbS={stars,caught:!!caught,time:Math.round(time),fuel:Math.round(ship.fuel),off:Math.round(caught?0:off||0),samples:ship.samples||0,integ:Math.round(ship.integ??100),lost:ship.stats.lost||0,rocket:RK.short},lbSc=LB_SCORE.mission(lbS);
   setTimeout(()=>{
     show(`<div class="eyebrow">Mission complete</div><h2>${caught?'Caught at Port Meridian':'Mars and back'}</h2>
     <p>${['A bit scrappy, but everyone walked off.','Solid flying, commander.','Properly good. The tower crew applauded.','That was textbook.','Flawless. They will name a crater after you.'][stars-1]}</p>
     <div class="stats">
       <div class="stat"><span>Rating</span><b style="color:var(--warn)">${'★'.repeat(stars)}${'☆'.repeat(5-stars)}</b></div>
+      <div class="stat"><span>Score</span><b style="color:var(--warn)">${lbSc.toLocaleString()}</b></div>
       <div class="stat"><span>Mission time</span><b>${mm}:${String(ss).padStart(2,'0')}</b></div>
       <div class="stat"><span>Return</span><b>${caught?'Tower catch':Math.round(off)+' m off centre'}</b></div>
       <div class="stat"><span>Fuel left</span><b>${Math.round(ship.fuel)}%</b></div>
@@ -1256,8 +1274,9 @@ function win(off,caught){
       <div class="stat"><span>Hull integrity</span><b>${Math.round(ship.integ??100)}%</b></div>
       <div class="stat"><span>Jezero Base</span><b style="font-size:15px">${colBuilt().length} building${colBuilt().length===1?'':'s'}</b></div>
     </div>
+    <div class="lbx" id="lbx"></div>
     <div class="btns"><button class="btn" id="again">Fly again</button></div>`);
-    $('again').onclick=()=>{hide();menu()};
+    rebindResults=()=>{$('again').onclick=()=>{hide();menu()};lbMount('mission',lbS,lbSc)};rebindResults();
   },1600);
 }
 
@@ -1340,7 +1359,7 @@ function menu(){
       ${colony.scout?`<div>SCOUT-1 robotic rover · ${Math.round(colony.scout.hp)}% health · ${Math.round(colony.scout.odo||0)} m driven</div>`:''}
       <div>${colBuilt().length?`${colBuilt().length} building${colBuilt().length===1?'':'s'} · crew of ${colCrew()} · ${colBuilt().map(k=>MODS[k].short+(modMax(k)>1?' L'+colN(k):'')).join(', ')}${colPop()?` · ${colPop()} colonists`:''}${colony.builds?` · ${colony.builds} crew projects`:''}${colony.samples?` · ${colony.samples} sample tube${colony.samples>1?'s':''} returned`:''}`:'Every rocket that lands on Mars delivers its cargo here. Sending the same module again upgrades it, up to level 3.'}</div></div>
     <div class="keys">${SAVE.cloud?'Progress saves to your Claude account at every phase, so you can pick up on another device.':'Progress saves in this browser at every phase.'}</div>
-    <div class="toggles"><button class="tg" id="mSet">Settings</button><button class="tg" id="mHow">How to play</button><button class="tg" id="mCred">Credits</button><button class="tg" id="mFb">Feedback</button><button class="tg" id="tgS" aria-pressed="${AU.on}">Sound ${AU.on?'on':'off'}</button></div>
+    <div class="toggles"><button class="tg" id="mLb">Leaderboard</button><button class="tg" id="mSet">Settings</button><button class="tg" id="mHow">How to play</button><button class="tg" id="mCred">Credits</button><button class="tg" id="mFb">Feedback</button><button class="tg" id="tgS" aria-pressed="${AU.on}">Sound ${AU.on?'on':'off'}</button></div>
     <div class="btns"><button class="btn" id="start">Light the candle</button><button class="btn ghost" id="fs2">Flight school</button></div>
     <div class="keys">Flight: ← → rotate · ↑ or Space thrust · E engine mode · S stage · P chute · M mine (in orbit) · +/− zoom<br>Rover: ← → drive · Space for the action button · L launch</div>`);
     document.querySelectorAll('.cg').forEach(b=>{b.onclick=()=>{cargoSel=b.dataset.c;sfx('ui');draw()};requestAnimationFrame(()=>paintCargoArt(b.querySelector('canvas'),b.dataset.c,+b.dataset.lv))});
@@ -1348,7 +1367,7 @@ function menu(){
     if($('cont'))$('cont').onclick=()=>{hide();continueGame()};
     if($('dsv'))$('dsv').onclick=e=>{const b=e.currentTarget;if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='Tap again to discard';return}clearGame();draw()};
     $('tgS').onclick=()=>{AU.on=!AU.on;auSave();updSnd();auInit();draw()};
-    $('mSet').onclick=()=>settingsScreen(menu);$('mHow').onclick=()=>howToScreen(menu);$('mCred').onclick=()=>creditsScreen(menu);$('mFb').onclick=()=>feedbackScreen(menu);
+    $('mLb').onclick=()=>leaderboardScreen(menu);$('mSet').onclick=()=>settingsScreen(menu);$('mHow').onclick=()=>howToScreen(menu);$('mCred').onclick=()=>creditsScreen(menu);$('mFb').onclick=()=>feedbackScreen(menu);
     document.querySelectorAll('.rk').forEach(b=>{b.onclick=()=>{setRocket(b.dataset.r);draw()};requestAnimationFrame(()=>drawPreview(b.querySelector('canvas'),ROCKETS[b.dataset.r]))});
     document.querySelectorAll('.slot').forEach(b=>b.onclick=()=>{const i=+b.dataset.s;hangar[i]=hangar[i]==='SL'?'VAC':'SL';draw()});
     $('start').onclick=()=>{hide();ship=newShip();S.clock=0;buildEngChips();checkpoint('launch')};
@@ -1401,6 +1420,61 @@ function updSnd(){const b=$('snd');b.textContent=AU.on?'SOUND ON':'SOUND OFF';b.
 $('snd').addEventListener('click',()=>{AU.on=!AU.on;auSave();updSnd();auInit()});
 updSnd();
 $('tac').addEventListener('click',()=>setTac(!TAC));
+/* ---------- world leaderboard (Netlify function + blob store). Scores are recomputed on the server from the stats ---------- */
+const LB_URL=location.protocol.startsWith('http')&&/(^|\.)netlify\.app$|^localhost$/.test(location.hostname)?'/api/leaderboard':'https://mars-round-trip.netlify.app/api/leaderboard';
+const LB_NAMES={school:'Flight School',mission:'Mars Round Trip'};
+const LB_SCORE={
+  school:x=>Math.round((x.caught?1000:600)+Math.max(0,180-x.time)*3+Math.max(0,100-x.fuelUsed)*3),
+  mission:x=>Math.max(0,Math.round(1000*x.stars+(x.caught?1500:Math.max(0,500-x.off*10))+x.fuel*20+Math.max(0,1500-x.time)*2+x.samples*250+x.integ*5-x.lost*200))
+};
+function lbPid(){let p='';try{p=localStorage.getItem('mrt.pid')||''}catch(e){}if(!/^[a-f0-9]{20}$/.test(p)){const a=new Uint8Array(10);crypto.getRandomValues(a);p=[...a].map(v=>v.toString(16).padStart(2,'0')).join('');try{localStorage.setItem('mrt.pid',p)}catch(e){}}return p}
+const lbName=()=>{try{return localStorage.getItem('mrt.name')||''}catch(e){return''}};
+const lbSetName=n=>{try{localStorage.setItem('mrt.name',n)}catch(e){}};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mmss=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+async function lbCall(opts){const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),9000);
+  try{const r=await fetch(opts.q?LB_URL+'?'+opts.q:LB_URL,opts.body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(opts.body),signal:ctl.signal}:{signal:ctl.signal});
+    const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Leaderboard unavailable');return j}
+  catch(e){throw new Error(e.name==='AbortError'||e instanceof TypeError?'Leaderboard offline · it works on the live site':e.message)}finally{clearTimeout(to)}}
+const lbDetail=(board,x)=>!x?'':board==='school'?`${x.caught?'Tower catch':'Mount landing'} · ${mmss(x.time)} · ${x.fuelUsed}% fuel`:`${'★'.repeat(x.stars)} · ${mmss(x.time)} · ${x.caught?'caught':x.off+' m off'}${x.rocket?' · '+esc(x.rocket):''}`;
+function lbRows(board,top,you,max){
+  const me=you&&you.r;let h=top.slice(0,max).map(e=>`<div class="lbr${e.r===me?' me':''}"><i>${e.r}</i><b>${esc(e.n)}</b><span>${lbDetail(board,e.x)}</span><em>${e.s.toLocaleString()}</em></div>`).join('');
+  if(you&&you.r>max)h+=`<div class="lbr gap">⋯</div><div class="lbr me"><i>${you.r}</i><b>${esc(you.n)}</b><span>${lbDetail(board,you.x)}</span><em>${you.s.toLocaleString()}</em></div>`;
+  return h||'<div class="lbnote">No scores yet. Be the first.</div>'}
+// the panel on a results screen
+function lbMount(board,stats,score){
+  const el=$('lbx');if(!el)return;
+  const ask=(err)=>{el.innerHTML=`<div class="lbh">World leaderboard · ${LB_NAMES[board]}</div>${err?`<div class="lbnote bad">${esc(err)}</div>`:''}
+    <div class="lbform"><input id="lbN" maxlength="16" placeholder="Your callsign" value="${esc(lbName())}" autocomplete="nickname"><button class="tg" id="lbP">Post ${score.toLocaleString()}</button></div>`;
+    const go=()=>{const n=$('lbN').value.trim().replace(/\s+/g,' ');if(!/^[A-Za-z0-9 _.\-]{2,16}$/.test(n)){ask('2 to 16 letters, numbers, spaces, _ . or -');return}lbSetName(n);post()};
+    $('lbP').onclick=go;$('lbN').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go()}}};
+  const post=async()=>{el.innerHTML=`<div class="lbh">World leaderboard · ${LB_NAMES[board]}</div><div class="lbnote">Posting as ${esc(lbName())}…</div>`;
+    try{const r=await lbCall({body:{board,id:lbPid(),name:lbName(),stats}});if(!$('lbx'))return;
+      const you=r.top.find(e=>e.r===r.rank)||{r:r.rank,n:lbName(),s:r.best,x:null};
+      el.innerHTML=`<div class="lbh">World leaderboard · ${LB_NAMES[board]}</div>
+        <div class="lbrank"><b>#${r.rank}</b> of ${r.total} pilot${r.total===1?'':'s'}${r.improved?(r.rank<=3?' · podium!':' · new personal best'):` · your best is ${r.best.toLocaleString()}`}</div>
+        <div class="lbl">${lbRows(board,r.top,you,5)}</div>
+        <div class="lbact"><button class="tg" id="lbAll">Full leaderboard</button><button class="tg" id="lbRen">Change callsign</button></div>`;
+      if(r.rank===1&&r.improved){sfx('chime');callout('Mission control here. You are number one on the world board. Outstanding flying.')}
+      $('lbRen').onclick=()=>ask();
+      $('lbAll').onclick=()=>{const cur=$('card').innerHTML;leaderboardScreen(()=>{show(cur);rebindResults&&rebindResults()},board)}}
+    catch(e){if($('lbx'))ask(e.message)}};
+  if(lbName())post();else ask();
+}
+let rebindResults=null;
+function leaderboardScreen(back,board='school'){
+  const draw=async(b)=>{
+    show(`<div class="eyebrow">World leaderboard</div><h2>Top pilots</h2>
+    <div class="lbtabs"><button class="tg" id="lbT1" aria-pressed="${b==='school'}">Flight School</button><button class="tg" id="lbT2" aria-pressed="${b==='mission'}">Mars Round Trip</button></div>
+    <div class="lbl" id="lbL"><div class="lbnote">Loading…</div></div>
+    <p class="keys">${b==='school'?'Score: a tower catch beats a mount landing, then faster and less fuel scores higher.':'Score: star rating, a tower catch at Port Meridian, fuel left, mission time, sample tubes returned and hull integrity, minus burned-out engines.'}${lbName()?` You fly as <b>${esc(lbName())}</b>.`:''}</p>
+    <div class="btns"><button class="btn" id="bk">Back</button></div>`);
+    $('bk').onclick=back;$('lbT1').onclick=()=>draw('school');$('lbT2').onclick=()=>draw('mission');
+    try{const r=await lbCall({q:`board=${b}&id=${lbPid()}`});if($('lbL'))$('lbL').innerHTML=lbRows(b,r.top,r.you,50)+`<div class="lbnote">${r.total} pilot${r.total===1?'':'s'} on the board</div>`}
+    catch(e){if($('lbL'))$('lbL').innerHTML=`<div class="lbnote bad">${esc(e.message)}</div>`}
+  };
+  draw(board);
+}
 /* ---------- menus: settings, how to play, credits, feedback ---------- */
 function setRow(id,label,val){return `<div class="setr"><label for="${id}">${label}</label><input type="range" id="${id}" min="0" max="100" step="5" value="${Math.round(val*100)}"><output id="${id}o">${Math.round(val*100)}%</output></div>`}
 function settingsScreen(back){
