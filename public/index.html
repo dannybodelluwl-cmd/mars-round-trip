@@ -195,6 +195,11 @@ body.badge.surface #capcom{bottom:calc(234px + env(safe-area-inset-bottom,0px))}
 .lbr.me{background:rgba(255,194,61,.12);outline:1px solid rgba(255,194,61,.45)}.lbr.gap{background:none;text-align:center;display:block;color:rgba(240,240,250,.4)}
 .lbr:nth-child(1) i{color:#ffd76a}.lbr:nth-child(2) i{color:#d9e2ea}.lbr:nth-child(3) i{color:#e0a272}
 .lbnote{font-size:13px;color:rgba(240,240,250,.65)}.lbnote.bad{color:var(--warn)}
+ #lbSide{position:absolute;z-index:41;right:max(40px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);width:min(380px,30vw);max-height:84vh;overflow:auto;display:grid;gap:12px;align-content:start;
+  padding:22px;border:1px solid rgba(240,240,250,.16);border-radius:12px;background:rgba(6,9,13,.72);backdrop-filter:blur(8px);font-family:var(--din);color:var(--sw)}
+#lbSide h3{margin:0;font-weight:700;font-size:28px;letter-spacing:.03em;text-transform:uppercase;color:#fff}
+#lbSide .lbl{max-height:none}#lbSide .lbmore{justify-self:start;font-size:12px;padding:8px 14px}
+@media (max-width:1099px),(max-height:560px){#lbSide{display:none!important}}
 .lbact,.lbtabs{display:flex;gap:8px;flex-wrap:wrap}.lbtabs .tg{font-size:12px;padding:8px 14px}
 .tg{border:1px solid #3a4654;background:transparent;border-radius:6px;font-size:11px;padding:6px 10px;color:var(--fg)}
 .tg[aria-pressed="false"]{color:var(--dim)}
@@ -305,6 +310,7 @@ canvas.cgart{display:block;width:calc(100% + 12px);margin:-8px -6px 6px;aspect-r
     <div class="mbig"><button class="arrow" data-k="left" aria-label="Drive left">◀</button><button class="arrow" data-k="right" aria-label="Drive right">▶</button><button id="bDo">Dig</button><button id="bEva" aria-label="EVA on foot">EVA</button><button id="bLaunch">Launch</button></div>
   </div>
   <form name="feedback" data-netlify="true" netlify-honeypot="bot" hidden><input name="bot"><textarea name="message"></textarea><input name="contact"><input name="context"></form>
+  <aside id="lbSide" hidden></aside>
   <div class="ov" id="ov" hidden><div class="card" id="card"></div></div>
 </div>
 
@@ -1367,7 +1373,7 @@ function menu(){
     if($('cont'))$('cont').onclick=()=>{hide();continueGame()};
     if($('dsv'))$('dsv').onclick=e=>{const b=e.currentTarget;if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='Tap again to discard';return}clearGame();draw()};
     $('tgS').onclick=()=>{AU.on=!AU.on;auSave();updSnd();auInit();draw()};
-    $('mLb').onclick=()=>leaderboardScreen(menu);$('mSet').onclick=()=>settingsScreen(menu);$('mHow').onclick=()=>howToScreen(menu);$('mCred').onclick=()=>creditsScreen(menu);$('mFb').onclick=()=>feedbackScreen(menu);
+    lbSideOn();$('mLb').onclick=()=>leaderboardScreen(menu);$('mSet').onclick=()=>settingsScreen(menu);$('mHow').onclick=()=>howToScreen(menu);$('mCred').onclick=()=>creditsScreen(menu);$('mFb').onclick=()=>feedbackScreen(menu);
     document.querySelectorAll('.rk').forEach(b=>{b.onclick=()=>{setRocket(b.dataset.r);draw()};requestAnimationFrame(()=>drawPreview(b.querySelector('canvas'),ROCKETS[b.dataset.r]))});
     document.querySelectorAll('.slot').forEach(b=>b.onclick=()=>{const i=+b.dataset.s;hangar[i]=hangar[i]==='SL'?'VAC':'SL';draw()});
     $('start').onclick=()=>{hide();ship=newShip();S.clock=0;buildEngChips();checkpoint('launch')};
@@ -1378,8 +1384,8 @@ function menu(){
 
 function ago(t){const s=(Date.now()-t)/1000;return s<90?'just now':s<5400?Math.round(s/60)+' min ago':s<129600?Math.round(s/3600)+' h ago':Math.round(s/86400)+' days ago'}
 function releaseInputs(){for(const k in keys)keys[k]=false;document.querySelectorAll('#ctl .on,#mine .on,#zoom .on').forEach(b=>b.classList.remove('on'));if(mining)mining.digging=false}
-function show(html){releaseInputs();$('card').innerHTML=html;$('ov').hidden=false;$('ov').scrollTop=0;document.body.classList.add('ovopen');S.paused=true}
-function hide(){$('ov').hidden=true;document.body.classList.remove('ovopen')}
+function show(html){releaseInputs();lbSideOff();$('card').innerHTML=html;$('ov').hidden=false;$('ov').scrollTop=0;document.body.classList.add('ovopen');S.paused=true}
+function hide(){lbSideOff();$('ov').hidden=true;document.body.classList.remove('ovopen')}
 // Card buttons fire on a clean tap even if the browser drops the click (seen on iOS after a held drive button)
 (()=>{const card=$('card');let down=null,fired=0;
   card.addEventListener('pointerdown',e=>{const b=e.target.closest('button');down=b?{b,x:e.clientX,y:e.clientY}:null},true);
@@ -1462,6 +1468,21 @@ function lbMount(board,stats,score){
   if(lbName())post();else ask();
 }
 let rebindResults=null;
+// desktop main menu: the board sits in the empty space on the right
+let lbSideBoard='school';const lbCache={};
+function lbSideOff(){const el=$('lbSide');if(el)el.hidden=true}
+async function lbSideOn(){
+  const el=$('lbSide');if(!el)return;el.hidden=false;const b=lbSideBoard;
+  const head=`<div class="eyebrow">World leaderboard</div><h3>Top pilots</h3>
+    <div class="lbtabs"><button class="tg" data-b="school" aria-pressed="${b==='school'}">Flight School</button><button class="tg" data-b="mission" aria-pressed="${b==='mission'}">Mars Round Trip</button></div>`;
+  const paint=(body)=>{if(el.hidden||lbSideBoard!==b)return;el.innerHTML=head+`<div class="lbl">${body}</div><button class="tg lbmore" id="lbSideAll">Full leaderboard</button>`;
+    el.querySelectorAll('[data-b]').forEach(t=>t.onclick=()=>{lbSideBoard=t.dataset.b;lbSideOn()});$('lbSideAll').onclick=()=>leaderboardScreen(menu,b)};
+  const c=lbCache[b];
+  if(c&&Date.now()-c.t<60000){paint(c.html);return}
+  paint('<div class="lbnote">Loading…</div>');
+  try{const r=await lbCall({q:`board=${b}&id=${lbPid()}`});const html=lbRows(b,r.top,r.you,10)+`<div class="lbnote">${r.total} pilot${r.total===1?'':'s'} on the board</div>`;lbCache[b]={t:Date.now(),html};paint(html)}
+  catch(e){paint(`<div class="lbnote bad">${esc(e.message)}</div>`)}
+}
 function leaderboardScreen(back,board='school'){
   const draw=async(b)=>{
     show(`<div class="eyebrow">World leaderboard</div><h2>Top pilots</h2>
